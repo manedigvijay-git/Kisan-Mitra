@@ -1,0 +1,601 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Camera,
+  FlaskConical,
+  Mic,
+  BookOpen,
+  Home,
+  Loader2,
+} from 'lucide-react';
+import { Language, FarmerProfile, WeatherData, FarmDiaryEntry } from './types';
+import { translations } from './locales/translations';
+import { auth, FarmDataSyncService, getRedirectResult } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { Header } from './components/Header';
+import { HomeScreen } from './components/HomeScreen';
+import { CropScannerModal } from './components/CropScannerModal';
+import { FertilizerScannerModal } from './components/FertilizerScannerModal';
+import { SoilReportModal } from './components/SoilReportModal';
+import { VoiceAssistantModal } from './components/VoiceAssistantModal';
+import { MyFarmModal } from './components/MyFarmModal';
+import { CropProblemsModal } from './components/CropProblemsModal';
+import { FarmDiaryModal } from './components/FarmDiaryModal';
+import { CostCalculatorModal } from './components/CostCalculatorModal';
+import { ExpertModal } from './components/ExpertModal';
+import { DemoTourModal } from './components/DemoTourModal';
+import { AuthModal } from './components/AuthModal';
+import { OnboardingWizardModal } from './components/OnboardingWizardModal';
+
+export default function App() {
+  const [language, setLanguage] = useState<Language>(() => {
+    return (localStorage.getItem('kisan_lang') as Language) || 'mr';
+  });
+
+  // Authentication State: NULL until verified by Firebase Auth
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+  const [profile, setProfile] = useState<FarmerProfile | null>(null);
+  const [diaryEntries, setDiaryEntries] = useState<FarmDiaryEntry[]>([]);
+
+  // Deep link or action parameter pending login
+  const [pendingAction, setPendingAction] = useState<string | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('action') || params.get('modal') || null;
+    } catch {
+      return null;
+    }
+  });
+
+  // System states
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+
+  // Active Modals
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [authInitialTab, setAuthInitialTab] = useState<'google' | 'phone' | 'email'>('google');
+  const [modalSampleId, setModalSampleId] = useState<string | undefined>(undefined);
+  const [modalQuery, setModalQuery] = useState<string | undefined>(undefined);
+
+  // Online / Offline monitor
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Firebase Auth listener and user profile loading
+  useEffect(() => {
+    let unsubFields: (() => void) | null = null;
+    let unsubDiary: (() => void) | null = null;
+
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          console.log('Google Sign-in via redirect successful:', result.user.displayName);
+        }
+      })
+      .catch((err) => {
+        console.warn('Redirect auth check notice:', err);
+      });
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Clean up existing subscriptions
+      if (unsubFields) { unsubFields(); unsubFields = null; }
+      if (unsubDiary) { unsubDiary(); unsubDiary = null; }
+
+      if (!firebaseUser) {
+        // User is LOGGED OUT
+        setProfile(null);
+        setDiaryEntries([]);
+        localStorage.removeItem('kisan_profile');
+        localStorage.removeItem('kisan_diary');
+        setIsAuthChecking(false);
+        return;
+      }
+
+      // User is LOGGED IN with Firebase UID
+      const uid = firebaseUser.uid;
+      try {
+        const docData = await FarmDataSyncService.getUserProfile(uid);
+
+        const isProfileComplete = Boolean(
+          docData && (
+            docData.profileCompleted === true ||
+            (docData.district && docData.village) ||
+            (docData.location?.district && docData.location?.village)
+          )
+        );
+
+        if (isProfileComplete && docData) {
+          // Profile exists and is complete
+          const loadedLocation = docData.location || {
+            village: docData.village || '',
+            taluka: docData.taluka || '',
+            district: docData.district || 'सातारा',
+            state: docData.state || 'Maharashtra',
+            latitude: docData.latitude || docData.lat || 17.68,
+            longitude: docData.longitude || docData.lon || 74.00,
+          };
+
+          const loadedProfile: FarmerProfile = {
+            id: uid,
+            uid: uid,
+            email: firebaseUser.email || docData.email || undefined,
+            photoURL: firebaseUser.photoURL || docData.photoURL || undefined,
+            isFirebaseUser: true,
+            profileCompleted: true,
+            name: docData.name || firebaseUser.displayName || 'शेतकरी मित्र',
+            phoneNumber: docData.phoneNumber || firebaseUser.phoneNumber || '',
+            language: docData.language || language,
+            location: loadedLocation,
+            activeFieldId: docData.activeFieldId || '',
+            fields: docData.fields || [],
+          };
+
+          setProfile(loadedProfile);
+
+          // Realtime subscriptions
+          unsubFields = FarmDataSyncService.subscribeFields(uid, (remoteFields) => {
+            if (remoteFields) {
+              setProfile((prev) => (prev ? {
+                ...prev,
+                fields: remoteFields,
+                activeFieldId: remoteFields.some((f) => f.id === prev.activeFieldId)
+                  ? prev.activeFieldId
+                  : remoteFields[0]?.id || '',
+              } : null));
+            }
+          });
+
+          unsubDiary = FarmDataSyncService.subscribeDiary(uid, (remoteEntries) => {
+            if (remoteEntries) {
+              setDiaryEntries(remoteEntries);
+            }
+          });
+
+          // Check deep link pending action
+          if (pendingAction) {
+            setActiveModal(pendingAction);
+            setPendingAction(null);
+          }
+        } else {
+          // Profile incomplete or doesn't exist yet → Farmer Onboarding
+          const incompleteProfile: FarmerProfile = {
+            id: uid,
+            uid: uid,
+            email: firebaseUser.email || undefined,
+            photoURL: firebaseUser.photoURL || undefined,
+            isFirebaseUser: true,
+            profileCompleted: false,
+            name: firebaseUser.displayName || '',
+            phoneNumber: firebaseUser.phoneNumber || '',
+            language: language,
+            location: {
+              village: '',
+              taluka: '',
+              district: 'सातारा',
+              state: 'Maharashtra',
+              latitude: 17.68,
+              longitude: 74.00,
+            },
+            activeFieldId: '',
+            fields: [],
+          };
+          setProfile(incompleteProfile);
+          setActiveModal('onboarding');
+        }
+      } catch (err) {
+        console.warn('Error loading user profile:', err);
+      } finally {
+        setIsAuthChecking(false);
+      }
+    });
+
+    return () => {
+      if (unsubFields) unsubFields();
+      if (unsubDiary) unsubDiary();
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // Sync language selection
+  useEffect(() => {
+    localStorage.setItem('kisan_lang', language);
+  }, [language]);
+
+  // Fetch weather data when profile location is available
+  useEffect(() => {
+    if (!profile?.location) return;
+    const fetchWeather = async () => {
+      try {
+        const res = await fetch(
+          `/api/weather?lat=${profile.location.latitude || 20.03}&lon=${profile.location.longitude || 78.53}&language=${language}`
+        );
+        const data = await res.json();
+        if (data.weather) {
+          setWeather(data.weather);
+        }
+      } catch (err) {
+        console.warn('Weather fetch error:', err);
+      }
+    };
+    fetchWeather();
+  }, [language, profile?.location?.latitude, profile?.location?.longitude]);
+
+  // Action handlers
+  const handleOpenAction = (actionId: string, sampleId?: string, query?: string) => {
+    setModalSampleId(sampleId);
+    setModalQuery(query);
+    setActiveModal(actionId);
+  };
+
+  const handleCloseModal = () => {
+    setActiveModal(null);
+    setModalSampleId(undefined);
+    setModalQuery(undefined);
+  };
+
+  const handleSaveToDiary = (entry: { title: string; description: string; cost?: number; photoUrl?: string }) => {
+    if (!profile?.uid) return;
+    const newEntry: FarmDiaryEntry = {
+      id: `diary_${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      fieldId: profile.activeFieldId || 'field_1',
+      activityType: 'problem',
+      title: entry.title,
+      description: entry.description,
+      cost: entry.cost,
+      photoUrl: entry.photoUrl,
+    };
+    setDiaryEntries((prev) => [newEntry, ...prev]);
+    FarmDataSyncService.saveDiaryEntry(profile.uid, newEntry).catch((err) =>
+      console.warn('Sync diary entry notice:', err)
+    );
+  };
+
+  const handleSaveSoilToFarm = (soilSummary: string) => {
+    if (!profile?.uid) return;
+    setProfile((prev) => {
+      if (!prev) return null;
+      const updatedFields = prev.fields.map((f) =>
+        f.id === prev.activeFieldId ? { ...f, soilHealthSummary: soilSummary } : f
+      );
+      const updatedField = updatedFields.find((f) => f.id === prev.activeFieldId);
+      if (updatedField && prev.uid) {
+        FarmDataSyncService.saveField(prev.uid, updatedField).catch((err) =>
+          console.warn('Sync field notice:', err)
+        );
+      }
+      return {
+        ...prev,
+        fields: updatedFields,
+      };
+    });
+  };
+
+  // 1. App Startup Authentication Loading Screen
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-stone-900 text-white flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-3xl shadow-xl mb-4 animate-bounce">
+          👨‍🌾
+        </div>
+        <h1 className="text-2xl font-black text-emerald-400 mb-1">किसान मित्र (Kisan Mitra)</h1>
+        <p className="text-stone-300 text-xs font-semibold animate-pulse flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+          <span>प्रमाणपत्र तपासत आहे... (Checking authentication...)</span>
+        </p>
+      </div>
+    );
+  }
+
+  // 2. Logged-out state: ALWAYS show Login Screen, NEVER show Home or Profile data
+  if (!profile || !profile.uid) {
+    return (
+      <div className="min-h-screen bg-stone-950 flex items-center justify-center p-3 font-sans">
+        <AuthModal
+          language={language}
+          profile={null}
+          onClose={undefined}
+          initialTab={authInitialTab}
+          isFullScreen={true}
+        />
+      </div>
+    );
+  }
+
+  // 3. Logged-in state: Home Screen Dashboard
+  return (
+    <div className="min-h-screen bg-stone-100 text-stone-900 flex flex-col font-sans selection:bg-emerald-200">
+      {/* Top Header */}
+      <Header
+        language={language}
+        onLanguageChange={setLanguage}
+        profile={profile}
+        onOpenFarmModal={() => handleOpenAction('my_farm')}
+        onStartDemoTour={() => handleOpenAction('demo_tour')}
+        isAudioMuted={isAudioMuted}
+        onToggleAudioMute={() => setIsAudioMuted(!isAudioMuted)}
+        isOffline={isOffline}
+        onOpenAuthModal={() => handleOpenAction('auth')}
+      />
+
+      {/* Main Home Screen Dashboard */}
+      <main className="flex-1">
+        <HomeScreen
+          language={language}
+          profile={profile}
+          weather={weather}
+          onOpenAction={handleOpenAction}
+          onStartDemoTour={() => handleOpenAction('demo_tour')}
+          isAudioMuted={isAudioMuted}
+          onOpenAuthTab={(tab) => {
+            setAuthInitialTab(tab);
+            setActiveModal('auth');
+          }}
+          onEditProfile={() => setActiveModal('onboarding')}
+        />
+      </main>
+
+      {/* Bottom Floating Navigation for Instant Access */}
+      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-stone-200 py-2 px-3 shadow-lg">
+        <div className="max-w-md mx-auto grid grid-cols-5 gap-1 text-center">
+          <button
+            onClick={() => handleCloseModal()}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-emerald-800 hover:bg-stone-100 cursor-pointer"
+          >
+            <Home className="w-5 h-5" />
+            <span className="text-[10px] font-extrabold mt-0.5">मुख्य</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenAction('scan_crop')}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-emerald-700 hover:bg-stone-100 cursor-pointer"
+          >
+            <Camera className="w-5 h-5" />
+            <span className="text-[10px] font-extrabold mt-0.5">पीक स्कॅन</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenAction('ask_voice')}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-blue-700 hover:bg-blue-50 cursor-pointer relative"
+          >
+            <div className="w-9 h-9 -mt-4 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md">
+              <Mic className="w-5 h-5" />
+            </div>
+            <span className="text-[10px] font-black text-blue-700 mt-0.5">आवाज</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenAction('check_fertilizer')}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-amber-700 hover:bg-stone-100 cursor-pointer"
+          >
+            <FlaskConical className="w-5 h-5" />
+            <span className="text-[10px] font-extrabold mt-0.5">खत खात्री</span>
+          </button>
+
+          <button
+            onClick={() => handleOpenAction('farm_diary')}
+            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-stone-700 hover:bg-stone-100 cursor-pointer"
+          >
+            <BookOpen className="w-5 h-5" />
+            <span className="text-[10px] font-extrabold mt-0.5">डायरी</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* ALL MODALS */}
+      {activeModal === 'scan_crop' && (
+        <CropScannerModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onSaveToDiary={handleSaveToDiary}
+          onOpenExpert={() => handleOpenAction('ask_expert')}
+          initialSampleId={modalSampleId}
+        />
+      )}
+
+      {activeModal === 'check_fertilizer' && (
+        <FertilizerScannerModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onSaveToDiary={handleSaveToDiary}
+          onOpenExpert={() => handleOpenAction('ask_expert')}
+          initialSampleId={modalSampleId}
+        />
+      )}
+
+      {activeModal === 'check_soil' && (
+        <SoilReportModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onSaveToFarm={handleSaveSoilToFarm}
+          initialSampleId={modalSampleId}
+        />
+      )}
+
+      {activeModal === 'ask_voice' && (
+        <VoiceAssistantModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onNavigateAction={handleOpenAction}
+          initialQuery={modalQuery}
+        />
+      )}
+
+      {activeModal === 'my_farm' && (
+        <MyFarmModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onEditProfile={() => setActiveModal('onboarding')}
+          onUpdateProfile={(updated) => {
+            setProfile(updated);
+            if (updated.uid) {
+              const profileData = {
+                id: updated.uid,
+                uid: updated.uid,
+                name: updated.name,
+                email: updated.email || '',
+                photoURL: updated.photoURL || '',
+                phoneNumber: updated.phoneNumber || '',
+                language: updated.language || language,
+                profileCompleted: true,
+                location: updated.location,
+                village: updated.location?.village || '',
+                district: updated.location?.district || '',
+                taluka: updated.location?.taluka || '',
+                state: updated.location?.state || 'Maharashtra',
+                latitude: updated.location?.latitude || 17.68,
+                longitude: updated.location?.longitude || 74.00,
+                activeFieldId: updated.activeFieldId || '',
+                updatedAt: new Date().toISOString(),
+              };
+
+              FarmDataSyncService.saveUserProfile(updated.uid, profileData).catch((err) =>
+                console.warn('Sync profile notice:', err)
+              );
+
+              if (updated.fields && updated.fields.length > 0) {
+                updated.fields.forEach((f) => {
+                  FarmDataSyncService.saveField(updated.uid!, f).catch((err) =>
+                    console.warn('Sync field notice:', err)
+                  );
+                });
+              }
+            }
+          }}
+        />
+      )}
+
+      {activeModal === 'crop_problems' && (
+        <CropProblemsModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onSelectProblemForScan={(crop) => handleOpenAction('scan_crop')}
+        />
+      )}
+
+      {activeModal === 'farm_diary' && (
+        <FarmDiaryModal
+          language={language}
+          profile={profile}
+          diaryEntries={diaryEntries}
+          onClose={handleCloseModal}
+          onAddEntry={(entry) => {
+            const newEntry = { ...entry, id: `diary_${Date.now()}` };
+            setDiaryEntries((prev) => [newEntry, ...prev]);
+            if (profile.uid) {
+              FarmDataSyncService.saveDiaryEntry(profile.uid, newEntry).catch((err) =>
+                console.warn('Sync diary entry notice:', err)
+              );
+            }
+          }}
+        />
+      )}
+
+      {activeModal === 'cost_calculator' && (
+        <CostCalculatorModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+        />
+      )}
+
+      {activeModal === 'ask_expert' && (
+        <ExpertModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+        />
+      )}
+
+      {activeModal === 'demo_tour' && (
+        <DemoTourModal
+          language={language}
+          onClose={handleCloseModal}
+          onTriggerAction={handleOpenAction}
+        />
+      )}
+
+      {activeModal === 'auth' && (
+        <AuthModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          initialTab={authInitialTab}
+          onTriggerOnboarding={() => setActiveModal('onboarding')}
+        />
+      )}
+
+      {activeModal === 'onboarding' && (
+        <OnboardingWizardModal
+          language={language}
+          profile={profile}
+          onClose={handleCloseModal}
+          onComplete={(updatedProfile) => {
+            const completedProf: FarmerProfile = {
+              ...updatedProfile,
+              profileCompleted: true,
+            };
+            setProfile(completedProf);
+            if (language !== updatedProfile.language) {
+              setLanguage(updatedProfile.language || 'mr');
+              localStorage.setItem('kisan_lang', updatedProfile.language || 'mr');
+            }
+            if (updatedProfile.uid) {
+              const profileData = {
+                id: updatedProfile.uid,
+                uid: updatedProfile.uid,
+                name: updatedProfile.name,
+                nameSource: updatedProfile.nameSource || 'custom',
+                email: updatedProfile.email || '',
+                photoURL: updatedProfile.photoURL || '',
+                phoneNumber: updatedProfile.phoneNumber || '',
+                language: updatedProfile.language || 'mr',
+                languageSource: updatedProfile.languageSource || 'recommended',
+                profileCompleted: true,
+                location: updatedProfile.location,
+                village: updatedProfile.location?.village || '',
+                villageSource: updatedProfile.location?.villageSource || 'recommended',
+                district: updatedProfile.location?.district || '',
+                districtSource: updatedProfile.location?.districtSource || 'recommended',
+                taluka: updatedProfile.location?.taluka || '',
+                talukaSource: updatedProfile.location?.talukaSource || 'recommended',
+                state: updatedProfile.location?.state || 'Maharashtra',
+                latitude: updatedProfile.location?.latitude || 17.68,
+                longitude: updatedProfile.location?.longitude || 74.00,
+                activeFieldId: updatedProfile.activeFieldId || '',
+                updatedAt: new Date().toISOString(),
+              };
+
+              FarmDataSyncService.saveUserProfile(updatedProfile.uid, profileData).catch((err) =>
+                console.warn('Save user profile error:', err)
+              );
+
+              if (updatedProfile.fields && updatedProfile.fields.length > 0) {
+                updatedProfile.fields.forEach((f) => {
+                  FarmDataSyncService.saveField(updatedProfile.uid!, f).catch((err) =>
+                    console.warn('Save field error:', err)
+                  );
+                });
+              }
+            }
+            handleCloseModal();
+          }}
+        />
+      )}
+    </div>
+  );
+}

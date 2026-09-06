@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Farmer profile details including preferred language and village coordinates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phoneNumber": { "type": "string", "maxLength": 20 },
+        "language": { "type": "string", "enum": ["mr", "hi", "en"], "maxLength": 5 },
+        "village": { "type": "string", "maxLength": 100 },
+        "district": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "language"]
+    },
+    "FarmField": {
+      "title": "FarmField",
+      "description": "Individual agricultural plot or parcel registered by the farmer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "crop": { "type": "string", "maxLength": 100 },
+        "acreage": { "type": "number" },
+        "sowingDate": { "type": "string", "maxLength": 20 },
+        "soilType": { "type": "string", "maxLength": 100 },
+        "cropStage": { "type": "string", "maxLength": 100 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "crop"]
+    },
+    "FarmDiaryEntry": {
+      "title": "FarmDiaryEntry",
+      "description": "Activity, expense, spraying, or observation logged in the farmer's diary",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "fieldId": { "type": "string", "maxLength": 128 },
+        "activityType": { "type": "string", "maxLength": 50 },
+        "date": { "type": "string", "maxLength": 20 },
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "cost": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "fieldId", "title", "activityType"]
+    },
+    "SoilReport": {
+      "title": "SoilReport",
+      "description": "Digital soil health card records and diagnostic parameters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "fieldId": { "type": "string", "maxLength": 128 },
+        "sampleDate": { "type": "string", "maxLength": 30 },
+        "labName": { "type": "string", "maxLength": 150 },
+        "overallSoilHealth": { "type": "string", "maxLength": 50 },
+        "simpleHealthSummary": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "fieldId", "overallSoilHealth"]
+    },
+    "CropDiagnosis": {
+      "title": "CropDiagnosis",
+      "description": "Saved crop disease and pest diagnostic records from AI photo analysis",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "cropName": { "type": "string", "maxLength": 100 },
+        "cropStage": { "type": "string", "maxLength": 100 },
+        "issueNameLocal": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "confidenceLevel": { "type": "string", "maxLength": 20 },
+        "immediateAction": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "cropName", "issueNameLocal"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Private farmer profile documents keyed by Firebase Auth UID"
+    },
+    "/users/{userId}/fields/{fieldId}": {
+      "schema": "FarmField",
+      "description": "Subcollection of agricultural plots belonging exclusively to the farmer"
+    },
+    "/users/{userId}/diary/{diaryId}": {
+      "schema": "FarmDiaryEntry",
+      "description": "Subcollection of daily farm logs and expenses belonging exclusively to the farmer"
+    },
+    "/users/{userId}/soil_reports/{reportId}": {
+      "schema": "SoilReport",
+      "description": "Subcollection of laboratory soil testing cards belonging exclusively to the farmer"
+    },
+    "/users/{userId}/diagnostics/{diagId}": {
+      "schema": "CropDiagnosis",
+      "description": "Subcollection of AI crop diagnoses saved by the farmer"
+    }
+  }
+}

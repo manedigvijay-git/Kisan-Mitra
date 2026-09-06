@@ -1,0 +1,136 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test document
+    match /test/{testId} {
+      allow read: if true;
+    }
+
+    // Global security primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Validation blueprints
+    function isValidUserProfile(data, userId) {
+      return data.id is string && data.id == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && (!('language' in data) || (data.language is string && data.language.size() <= 100))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 150))
+        && (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 50))
+        && (!('village' in data) || (data.village is string && data.village.size() <= 200))
+        && (!('district' in data) || (data.district is string && data.district.size() <= 200))
+        && (!('taluka' in data) || (data.taluka is string && data.taluka.size() <= 200));
+    }
+
+    function isValidFarmField(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 300
+        && data.crop is string && data.crop.size() > 0 && data.crop.size() <= 300
+        && (!('acreage' in data) || data.acreage is number)
+        && (!('cropStage' in data) || (data.cropStage is string && data.cropStage.size() <= 300))
+        && (!('soilType' in data) || (data.soilType is string && data.soilType.size() <= 300))
+        && (!('sowingDate' in data) || (data.sowingDate is string && data.sowingDate.size() <= 50))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    function isValidDiaryEntry(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.fieldId is string && isValidId(data.fieldId)
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.activityType is string && data.activityType.size() <= 50
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && (!('cost' in data) || data.cost is number)
+        && (!('date' in data) || (data.date is string && data.date.size() <= 30));
+    }
+
+    function isValidSoilReport(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.fieldId is string && isValidId(data.fieldId)
+        && data.overallSoilHealth is string && data.overallSoilHealth.size() <= 50
+        && (!('simpleHealthSummary' in data) || (data.simpleHealthSummary is string && data.simpleHealthSummary.size() <= 1000))
+        && (!('labName' in data) || (data.labName is string && data.labName.size() <= 150));
+    }
+
+    function isValidDiagnosis(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.cropName is string && data.cropName.size() > 0 && data.cropName.size() <= 100
+        && data.issueNameLocal is string && data.issueNameLocal.size() > 0 && data.issueNameLocal.size() <= 200
+        && (!('category' in data) || (data.category is string && data.category.size() <= 50))
+        && (!('confidenceLevel' in data) || (data.confidenceLevel is string && data.confidenceLevel.size() <= 20))
+        && (!('immediateAction' in data) || (data.immediateAction is string && data.immediateAction.size() <= 1000));
+    }
+
+    // Farmer Profile
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming(), userId);
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUserProfile(incoming(), userId)
+        && incoming().id == existing().id;
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Farm Fields subcollection
+      match /fields/{fieldId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(fieldId) && isValidFarmField(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(fieldId) && isValidFarmField(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(fieldId);
+      }
+
+      // Farm Diary & Expenses subcollection
+      match /diary/{diaryId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(diaryId) && isValidDiaryEntry(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(diaryId) && isValidDiaryEntry(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(diaryId);
+      }
+
+      // Soil Health Reports subcollection
+      match /soil_reports/{reportId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(reportId) && isValidSoilReport(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(reportId) && isValidSoilReport(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(reportId);
+      }
+
+      // Saved Crop Diagnostics subcollection
+      match /diagnostics/{diagId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(diagId) && isValidDiagnosis(incoming(), userId);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(diagId);
+      }
+    }
+  }
+}

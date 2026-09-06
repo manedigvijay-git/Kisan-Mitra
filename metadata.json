@@ -1,0 +1,6 @@
+{
+  "name": "Farmer Assistant (Kisan Mitra)",
+  "description": "Simple, trustworthy farming assistant for Indian farmers with crop photo diagnosis, fertilizer scanner & safety check, soil report reader, voice assistant, and farm diary in Marathi, Hindi, and English.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
