@@ -9,6 +9,7 @@ interface HeaderProps {
   onLanguageChange: (lang: Language) => void;
   profile: FarmerProfile;
   onOpenFarmModal: () => void;
+  onOpenFieldSelector?: () => void;
   onStartDemoTour: () => void;
   isAudioMuted: boolean;
   onToggleAudioMute: () => void;
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLanguageChange,
   profile,
   onOpenFarmModal,
+  onOpenFieldSelector,
   onStartDemoTour,
   isAudioMuted,
   onToggleAudioMute,
@@ -83,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
               <h1 className="font-bold text-base leading-tight tracking-tight">{t.appName}</h1>
             </div>
             <button
-              onClick={onOpenFarmModal}
+              onClick={onOpenFieldSelector || onOpenFarmModal}
               className="flex items-center gap-1 text-xs text-emerald-200 hover:text-white transition-colors cursor-pointer"
             >
               <MapPin className="w-3 h-3 text-amber-300" />

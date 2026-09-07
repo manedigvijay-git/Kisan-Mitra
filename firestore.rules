@@ -48,13 +48,13 @@ service cloud.firestore {
     function isValidFarmField(data, userId) {
       return data.id is string && isValidId(data.id)
         && data.userId is string && data.userId == userId
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 300
-        && data.crop is string && data.crop.size() > 0 && data.crop.size() <= 300
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 500
+        && data.crop is string && data.crop.size() > 0 && data.crop.size() <= 500
         && (!('acreage' in data) || data.acreage is number)
-        && (!('cropStage' in data) || (data.cropStage is string && data.cropStage.size() <= 300))
-        && (!('soilType' in data) || (data.soilType is string && data.soilType.size() <= 300))
-        && (!('sowingDate' in data) || (data.sowingDate is string && data.sowingDate.size() <= 50))
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
+        && (!('cropStage' in data) || (data.cropStage is string && data.cropStage.size() <= 500))
+        && (!('soilType' in data) || (data.soilType is string && data.soilType.size() <= 500))
+        && (!('sowingDate' in data) || (data.sowingDate is string && data.sowingDate.size() <= 100))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 5000));
     }
 
     function isValidDiaryEntry(data, userId) {
@@ -85,6 +85,37 @@ service cloud.firestore {
         && (!('category' in data) || (data.category is string && data.category.size() <= 50))
         && (!('confidenceLevel' in data) || (data.confidenceLevel is string && data.confidenceLevel.size() <= 20))
         && (!('immediateAction' in data) || (data.immediateAction is string && data.immediateAction.size() <= 1000));
+    }
+
+    function isValidAnimal(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.type is string && data.type.size() > 0 && data.type.size() <= 50
+        && (!('breed' in data) || (data.breed is string && data.breed.size() <= 100))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    function isValidTask(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.title is string && data.title.size() > 0 && data.title.size() <= 200
+        && data.dueDate is string && data.dueDate.size() <= 30;
+    }
+
+    function isValidFinance(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.type is string && (data.type == 'expense' || data.type == 'income')
+        && data.amount is number
+        && data.date is string && data.date.size() <= 30;
+    }
+
+    function isValidInventory(data, userId) {
+      return data.id is string && isValidId(data.id)
+        && data.userId is string && data.userId == userId
+        && data.productName is string && data.productName.size() > 0 && data.productName.size() <= 150
+        && data.category is string && data.category.size() <= 50;
     }
 
     // Farmer Profile
@@ -130,6 +161,53 @@ service cloud.firestore {
         allow get, list: if isOwner(userId) && isValidId(userId);
         allow create: if isOwner(userId) && isValidId(userId) && isValidId(diagId) && isValidDiagnosis(incoming(), userId);
         allow delete: if isOwner(userId) && isValidId(userId) && isValidId(diagId);
+      }
+
+      // Cattle & Livestock subcollection
+      match /animals/{animalId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(animalId) && isValidAnimal(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(animalId) && isValidAnimal(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(animalId);
+
+        // Animal health checks, milk, feed, vaccinations, treatments
+        match /{subcollection}/{subId} {
+          allow get, list: if isOwner(userId) && isValidId(userId);
+          allow create, update: if isOwner(userId) && isValidId(userId) && isValidId(subId);
+          allow delete: if isOwner(userId) && isValidId(userId) && isValidId(subId);
+        }
+      }
+
+      // Smart Farming Calendar Tasks
+      match /tasks/{taskId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(taskId) && isValidTask(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(taskId) && isValidTask(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(taskId);
+      }
+
+      // Farm Finances (Income & Expenses)
+      match /finances/{financeId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(financeId) && isValidFinance(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(financeId) && isValidFinance(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(financeId);
+      }
+
+      // Farm Inventory / Stock
+      match /inventory/{itemId} {
+        allow get, list: if isOwner(userId) && isValidId(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(itemId) && isValidInventory(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(itemId) && isValidInventory(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().id == existing().id;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(itemId);
       }
     }
   }

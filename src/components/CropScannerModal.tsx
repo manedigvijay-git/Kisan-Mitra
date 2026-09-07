@@ -13,10 +13,11 @@ import {
   Sparkles,
   PhoneCall,
 } from 'lucide-react';
-import { Language, CropAnalysisResult, FarmerProfile } from '../types';
+import { Language, CropAnalysisResult, FarmerProfile, Field } from '../types';
 import { translations } from '../locales/translations';
 import { SAMPLE_CROP_PHOTOS } from '../data/agronomyKnowledge';
 import { SpeechService } from '../utils/speech';
+import { FieldSelectorModal } from './FieldSelectorModal';
 
 interface CropScannerModalProps {
   language: Language;
@@ -25,6 +26,8 @@ interface CropScannerModalProps {
   onSaveToDiary: (entry: { title: string; description: string; photoUrl?: string }) => void;
   onOpenExpert: () => void;
   initialSampleId?: string;
+  onUpdateField?: (field: Field) => void;
+  onSelectField?: (fieldId: string) => void;
 }
 
 export const CropScannerModal: React.FC<CropScannerModalProps> = ({
@@ -34,9 +37,14 @@ export const CropScannerModal: React.FC<CropScannerModalProps> = ({
   onSaveToDiary,
   onOpenExpert,
   initialSampleId,
+  onUpdateField,
+  onSelectField,
 }) => {
   const t = translations[language];
-  const activeField = profile.fields.find((f) => f.id === profile.activeFieldId) || profile.fields[0];
+  const [activeFieldId, setActiveFieldId] = useState<string>(profile.activeFieldId || profile.fields[0]?.id || '');
+  const [isFieldSelectorOpen, setIsFieldSelectorOpen] = useState(false);
+
+  const activeField = profile.fields.find((f) => f.id === activeFieldId) || profile.fields[0];
 
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(() => {
     if (initialSampleId) {
@@ -145,12 +153,23 @@ export const CropScannerModal: React.FC<CropScannerModalProps> = ({
   };
 
   const handleSaveToDiary = () => {
-    if (!analysisResult) return;
+    if (!analysisResult || !activeField) return;
     onSaveToDiary({
-      title: `${activeField?.crop || 'Crop'} - ${analysisResult.issueNameLocal}`,
-      description: `लक्षणे: ${analysisResult.symptomsObserved.join(', ')}. उपाय: ${analysisResult.immediateAction}`,
+      title: `${activeField.crop} - ${analysisResult.issueNameLocal}`,
+      description: `शेत: ${activeField.name}. लक्षणे: ${analysisResult.symptomsObserved.join(', ')}. उपाय: ${analysisResult.immediateAction}`,
       photoUrl: photoDataUrl || '',
     });
+    if (onUpdateField) {
+      const updatedField: Field = {
+        ...activeField,
+        currentCropProblem: analysisResult.issueNameLocal,
+        recentProblems: [analysisResult.issueNameLocal, ...(activeField.recentProblems || []).filter((p) => p !== analysisResult.issueNameLocal)],
+        cropPhotoUrl: photoDataUrl || activeField.cropPhotoUrl,
+        cropPhotos: photoDataUrl ? [photoDataUrl, ...(activeField.cropPhotos || [])] : activeField.cropPhotos,
+        updatedAt: new Date().toISOString(),
+      };
+      onUpdateField(updatedField);
+    }
     setDiarySaved(true);
   };
 
@@ -183,6 +202,28 @@ export const CropScannerModal: React.FC<CropScannerModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Active Field Banner */}
+        {activeField && (
+          <div className="bg-emerald-50/90 border-b border-emerald-100 px-4 py-2 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <span className="text-emerald-800 font-bold">तपासणीसाठी शेत:</span>
+              <span className="font-extrabold text-emerald-950 truncate">
+                🌾 {activeField.name} — {activeField.crop}
+                <span className="text-stone-500 font-normal ml-1">({activeField.cropStage})</span>
+              </span>
+            </div>
+            {profile.fields.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setIsFieldSelectorOpen(true)}
+                className="shrink-0 ml-2 px-2.5 py-1 bg-white hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] rounded-lg border border-emerald-200 transition-colors shadow-xs cursor-pointer"
+              >
+                बदला
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Scrollable Body */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
@@ -483,6 +524,20 @@ export const CropScannerModal: React.FC<CropScannerModalProps> = ({
           )}
         </div>
       </div>
+
+      {isFieldSelectorOpen && (
+        <FieldSelectorModal
+          language={language}
+          fields={profile.fields}
+          activeFieldId={activeFieldId}
+          onSelectField={(id) => {
+            setActiveFieldId(id);
+            if (onSelectField) onSelectField(id);
+            setIsFieldSelectorOpen(false);
+          }}
+          onClose={() => setIsFieldSelectorOpen(false)}
+        />
+      )}
     </div>
   );
 };

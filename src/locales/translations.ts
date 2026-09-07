@@ -37,6 +37,19 @@ export interface TranslationStrings {
   btnFarmDiary: string;
   btnCostCalculator: string;
 
+  // New Smart Farm & Livestock Tools
+  btnLivestock: string;
+  btnLivestockDesc: string;
+  btnCalendar: string;
+  btnCalendarDesc: string;
+  btnFinance: string;
+  btnFinanceDesc: string;
+  btnInventory: string;
+  btnInventoryDesc: string;
+  activeAnimal: string;
+  switchAnimal: string;
+  emergencyAlert: string;
+
   // Crop Scanner
   cropScanTitle: string;
   selectPhotoType: string;
@@ -137,6 +150,18 @@ export const translations: Record<Language, TranslationStrings> = {
     btnFarmDiary: '📝 शेती दैनंदिनी (डायरी)',
     btnCostCalculator: '💰 खत खर्च कॅल्क्युलेटर',
 
+    btnLivestock: '🐄 गोपालन व पशुधन',
+    btnLivestockDesc: 'आरोग्य तपासणी, दुग्ध नोंद, लसीकरण व खाद्य व्यवस्थापन',
+    btnCalendar: '📅 शेती कॅलेंडर व कामे',
+    btnCalendarDesc: 'पाणी, खते, फवारणी व लसीकरणाच्या आठवणी',
+    btnFinance: '💰 शेती हिशोब (खर्च व उत्पन्न)',
+    btnFinanceDesc: 'खते, मजुरी, कीटकनाशक खर्च व पीक-दूध विक्री हिशोब',
+    btnInventory: '📦 गोदामातील साठा (स्टॉक)',
+    btnInventoryDesc: 'शिल्लक खते, बियाणे, औषधे व पशुखाद्य नोंद',
+    activeAnimal: 'सध्याचे जनावर',
+    switchAnimal: 'जनावर निवडा',
+    emergencyAlert: '🚨 तातडीचा पशुवैद्यकीय इशारा',
+
     cropScanTitle: 'पिकाचा फोटो काढून रोग-कीड तपासा',
     selectPhotoType: 'फोटो कशाचा आहे?',
     partLeaf: 'पान',
@@ -235,6 +260,18 @@ export const translations: Record<Language, TranslationStrings> = {
     btnFarmDiary: '📝 कृषि डायरी (रिकॉर्ड)',
     btnCostCalculator: '💰 खाद लागत कैलकुलेटर',
 
+    btnLivestock: '🐄 पशुपालन व डेयरी',
+    btnLivestockDesc: 'पशु स्वास्थ्य, दूध रिकॉर्ड, टीकाकरण और चारा प्रबंधन',
+    btnCalendar: '📅 कृषि कैलेंडर व कार्य',
+    btnCalendarDesc: 'सिंचाई, खाद, छिड़काव व टीकाकरण की याद दिलाएं',
+    btnFinance: '💰 खेत का हिसाब (खर्च व आय)',
+    btnFinanceDesc: 'खाद, मजदूरी खर्च और फसल-दूध बिक्री का पूरा ब्यौरा',
+    btnInventory: '📦 गोदाम स्टॉक (सामग्री)',
+    btnInventoryDesc: 'बची हुई खाद, बीज, कीटनाशक व पशु आहार का रिकॉर्ड',
+    activeAnimal: 'सक्रिय पशु',
+    switchAnimal: 'पशु चुनें',
+    emergencyAlert: '🚨 आपातकालीन पशु चिकित्सा चेतावनी',
+
     cropScanTitle: 'फसल की फोटो से रोग और कीट की जांच',
     selectPhotoType: 'फोटो किस भाग का है?',
     partLeaf: 'पत्ती',
@@ -332,6 +369,18 @@ export const translations: Record<Language, TranslationStrings> = {
 
     btnFarmDiary: '📝 Farm Diary (Logs)',
     btnCostCalculator: '💰 Fertilizer Cost Calculator',
+
+    btnLivestock: '🐄 Cattle & Livestock',
+    btnLivestockDesc: 'Animal health, milk records, vaccination & feed care',
+    btnCalendar: '📅 Farm Calendar & Tasks',
+    btnCalendarDesc: 'Watering, fertilizer, spray & vaccination reminders',
+    btnFinance: '💰 Farm Finance (Profit & Loss)',
+    btnFinanceDesc: 'Track fertilizer, labour costs & crop/milk income',
+    btnInventory: '📦 Farm Stock (Inventory)',
+    btnInventoryDesc: 'Remaining fertilizers, seeds, pesticides & animal feed',
+    activeAnimal: 'Active Animal',
+    switchAnimal: 'Switch Animal',
+    emergencyAlert: '🚨 Veterinary Emergency Alert',
 
     cropScanTitle: 'Scan Crop Photo for Issues',
     selectPhotoType: 'What part is photographed?',

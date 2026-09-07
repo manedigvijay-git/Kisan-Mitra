@@ -7,7 +7,22 @@ import {
   Home,
   Loader2,
 } from 'lucide-react';
-import { Language, FarmerProfile, WeatherData, FarmDiaryEntry } from './types';
+import {
+  Language,
+  FarmerProfile,
+  WeatherData,
+  FarmDiaryEntry,
+  Animal,
+  FarmTask,
+  FinanceRecord,
+  InventoryItem,
+  AnimalHealthCheck,
+  AnimalVaccination,
+  AnimalTreatment,
+  AnimalFeedRecord,
+  MilkRecord,
+  BreedingRecord,
+} from './types';
 import { translations } from './locales/translations';
 import { auth, FarmDataSyncService, getRedirectResult } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -25,6 +40,177 @@ import { ExpertModal } from './components/ExpertModal';
 import { DemoTourModal } from './components/DemoTourModal';
 import { AuthModal } from './components/AuthModal';
 import { OnboardingWizardModal } from './components/OnboardingWizardModal';
+import { FieldSelectorModal } from './components/FieldSelectorModal';
+import { AnimalSelectorModal } from './components/AnimalSelectorModal';
+import { LivestockModal } from './components/LivestockModal';
+import { FarmingCalendarModal } from './components/FarmingCalendarModal';
+import { FarmFinanceModal } from './components/FarmFinanceModal';
+import { FarmInventoryModal } from './components/FarmInventoryModal';
+
+const DEFAULT_ANIMALS: Animal[] = [
+  {
+    id: 'animal_1',
+    name: 'गौरी (Gauri)',
+    type: 'cow',
+    breed: 'गीर (Gir)',
+    ageYears: 4,
+    tagNumber: 'MH-12-8821',
+    pregnancyStatus: 'none',
+    lactationStage: 'lactating',
+    dailyMilkLiters: 12,
+    healthRecords: [
+      {
+        id: 'health_1',
+        animalId: 'animal_1',
+        date: '2025-02-15',
+        symptoms: ['डोळे व नाकातून सौम्य पाणी'],
+        notes: 'तापमान सामान्य, चारा व्यवस्थित खात आहे.',
+        severity: 'mild',
+        recommendedNextStep: 'स्वच्छ कोमट पाणी द्या, गोठा कोरडा ठेवा.',
+      },
+    ],
+    vaccinations: [
+      {
+        id: 'vac_1',
+        animalId: 'animal_1',
+        vaccineName: 'FMD (लाळ्या खुरकूत)',
+        administeredDate: '2024-11-10',
+        nextDueDate: '2025-05-10',
+        notes: 'शासकीय शिबिरात लस टोचली',
+      },
+      {
+        id: 'vac_2',
+        animalId: 'animal_1',
+        vaccineName: 'HS (घटसर्प)',
+        administeredDate: '2024-06-15',
+        nextDueDate: '2025-06-15',
+      },
+    ],
+    milkRecords: [
+      {
+        id: 'milk_1',
+        animalId: 'animal_1',
+        date: new Date().toISOString().split('T')[0],
+        morningLiters: 6.5,
+        eveningLiters: 5.5,
+        fatPercentage: 4.2,
+        snfPercentage: 8.6,
+      },
+    ],
+    notes: 'शांत स्वभावाची, दर्जेदार दूध उत्पादन.',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'animal_2',
+    name: 'लक्ष्मी (Lakshmi)',
+    type: 'buffalo',
+    breed: 'मुऱ्हा (Murrah)',
+    ageYears: 5,
+    tagNumber: 'MH-12-9042',
+    pregnancyStatus: 'pregnant',
+    inseminationDate: '2024-09-15',
+    expectedDeliveryDate: '2025-07-25',
+    lactationStage: 'dry',
+    dailyMilkLiters: 0,
+    healthRecords: [],
+    vaccinations: [
+      {
+        id: 'vac_3',
+        animalId: 'animal_2',
+        vaccineName: 'FMD (लाळ्या खुरकूत)',
+        administeredDate: '2024-11-10',
+        nextDueDate: '2025-05-10',
+      },
+    ],
+    milkRecords: [],
+    notes: 'गाभण आहे, विशेष खुराक व चारा सुरू आहे.',
+    createdAt: new Date().toISOString(),
+  },
+];
+
+const DEFAULT_TASKS: FarmTask[] = [
+  {
+    id: 'task_1',
+    title: 'ऊस शेतात १३:००:४५ खत सोडणे',
+    category: 'fertilizer',
+    dueDate: new Date().toISOString().split('T')[0],
+    isCompleted: false,
+    priority: 'high',
+    notes: 'ड्रीप द्वारे ४ किलो प्रति एकर',
+  },
+  {
+    id: 'task_2',
+    title: 'गौरी गाय लाळ्या खुरकूत लस बूस्टर',
+    category: 'vaccination',
+    dueDate: '2025-05-10',
+    isCompleted: false,
+    priority: 'medium',
+    animalId: 'animal_1',
+    notes: 'पशुवैद्यकीय दवाखान्यात संपर्क करणे',
+  },
+];
+
+const DEFAULT_FINANCES: FinanceRecord[] = [
+  {
+    id: 'fin_1',
+    type: 'expense',
+    category: 'fertilizer',
+    amount: 3200,
+    date: new Date().toISOString().split('T')[0],
+    title: 'युरिया व डीएपी खत खरेदी (२ गोणी)',
+  },
+  {
+    id: 'fin_2',
+    type: 'income',
+    category: 'crop_sale',
+    amount: 14500,
+    date: new Date().toISOString().split('T')[0],
+    title: 'सोयाबीन विक्री (स्थानिक बाजार समिती)',
+  },
+  {
+    id: 'fin_3',
+    type: 'income',
+    category: 'dairy_sale',
+    amount: 4800,
+    date: new Date().toISOString().split('T')[0],
+    title: 'डेअरी दूध बिल (८ दिवस)',
+  },
+];
+
+const DEFAULT_INVENTORY: InventoryItem[] = [
+  {
+    id: 'inv_1',
+    name: 'युरिया (Urea 46% N)',
+    category: 'fertilizer',
+    quantity: 2,
+    unit: 'बोरी / बॅग (Bags)',
+    minimumThreshold: 3,
+    purchaseDate: '2025-02-01',
+    expiryDate: '2026-02-01',
+    notes: '४५ किलो गोणी',
+  },
+  {
+    id: 'inv_2',
+    name: 'सरकी पेंढ (पशुखाद्य)',
+    category: 'cattle_feed',
+    quantity: 5,
+    unit: 'बोरी / बॅग (Bags)',
+    minimumThreshold: 2,
+    purchaseDate: '2025-02-10',
+    notes: 'गाईंसाठी पौष्टिक खुराक',
+  },
+  {
+    id: 'inv_3',
+    name: 'क्लोरोपायरीफॉस २०% ईसी',
+    category: 'pesticide',
+    quantity: 1,
+    unit: 'लिटर (Liters)',
+    minimumThreshold: 2,
+    purchaseDate: '2024-12-15',
+    expiryDate: '2026-12-15',
+    notes: 'कीड नियंत्रणासाठी',
+  },
+];
 
 export default function App() {
   const [language, setLanguage] = useState<Language>(() => {
@@ -35,6 +221,44 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [profile, setProfile] = useState<FarmerProfile | null>(null);
   const [diaryEntries, setDiaryEntries] = useState<FarmDiaryEntry[]>([]);
+
+  // Smart Farm & Livestock Management States
+  const [animals, setAnimals] = useState<Animal[]>(() => {
+    try {
+      const saved = localStorage.getItem('kisan_animals');
+      return saved ? JSON.parse(saved) : DEFAULT_ANIMALS;
+    } catch {
+      return DEFAULT_ANIMALS;
+    }
+  });
+  const [activeAnimalId, setActiveAnimalId] = useState<string>('animal_1');
+
+  const [tasks, setTasks] = useState<FarmTask[]>(() => {
+    try {
+      const saved = localStorage.getItem('kisan_tasks');
+      return saved ? JSON.parse(saved) : DEFAULT_TASKS;
+    } catch {
+      return DEFAULT_TASKS;
+    }
+  });
+
+  const [finances, setFinances] = useState<FinanceRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('kisan_finances');
+      return saved ? JSON.parse(saved) : DEFAULT_FINANCES;
+    } catch {
+      return DEFAULT_FINANCES;
+    }
+  });
+
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('kisan_inventory');
+      return saved ? JSON.parse(saved) : DEFAULT_INVENTORY;
+    } catch {
+      return DEFAULT_INVENTORY;
+    }
+  });
 
   // Deep link or action parameter pending login
   const [pendingAction, setPendingAction] = useState<string | null>(() => {
@@ -56,6 +280,7 @@ export default function App() {
   const [authInitialTab, setAuthInitialTab] = useState<'google' | 'phone' | 'email'>('google');
   const [modalSampleId, setModalSampleId] = useState<string | undefined>(undefined);
   const [modalQuery, setModalQuery] = useState<string | undefined>(undefined);
+  const [livestockInitialTab, setLivestockInitialTab] = useState<string>('overview');
 
   // Online / Offline monitor
   useEffect(() => {
@@ -73,6 +298,10 @@ export default function App() {
   useEffect(() => {
     let unsubFields: (() => void) | null = null;
     let unsubDiary: (() => void) | null = null;
+    let unsubAnimals: (() => void) | null = null;
+    let unsubTasks: (() => void) | null = null;
+    let unsubFinances: (() => void) | null = null;
+    let unsubInventory: (() => void) | null = null;
 
     getRedirectResult(auth)
       .then((result) => {
@@ -88,6 +317,10 @@ export default function App() {
       // Clean up existing subscriptions
       if (unsubFields) { unsubFields(); unsubFields = null; }
       if (unsubDiary) { unsubDiary(); unsubDiary = null; }
+      if (unsubAnimals) { unsubAnimals(); unsubAnimals = null; }
+      if (unsubTasks) { unsubTasks(); unsubTasks = null; }
+      if (unsubFinances) { unsubFinances(); unsubFinances = null; }
+      if (unsubInventory) { unsubInventory(); unsubInventory = null; }
 
       if (!firebaseUser) {
         // User is LOGGED OUT
@@ -159,6 +392,33 @@ export default function App() {
             }
           });
 
+          unsubAnimals = FarmDataSyncService.subscribeAnimals(uid, (remoteAnimals) => {
+            if (remoteAnimals && remoteAnimals.length > 0) {
+              setAnimals(remoteAnimals);
+              setActiveAnimalId((prev) =>
+                remoteAnimals.some((a) => a.id === prev) ? prev : remoteAnimals[0].id
+              );
+            }
+          });
+
+          unsubTasks = FarmDataSyncService.subscribeTasks(uid, (remoteTasks) => {
+            if (remoteTasks) {
+              setTasks(remoteTasks);
+            }
+          });
+
+          unsubFinances = FarmDataSyncService.subscribeFinances(uid, (remoteFinances) => {
+            if (remoteFinances) {
+              setFinances(remoteFinances);
+            }
+          });
+
+          unsubInventory = FarmDataSyncService.subscribeInventory(uid, (remoteInv) => {
+            if (remoteInv) {
+              setInventory(remoteInv);
+            }
+          });
+
           // Check deep link pending action
           if (pendingAction) {
             setActiveModal(pendingAction);
@@ -200,14 +460,34 @@ export default function App() {
     return () => {
       if (unsubFields) unsubFields();
       if (unsubDiary) unsubDiary();
+      if (unsubAnimals) unsubAnimals();
+      if (unsubTasks) unsubTasks();
+      if (unsubFinances) unsubFinances();
+      if (unsubInventory) unsubInventory();
       unsubscribeAuth();
     };
   }, []);
 
-  // Sync language selection
+  // Sync language and offline data
   useEffect(() => {
     localStorage.setItem('kisan_lang', language);
   }, [language]);
+
+  useEffect(() => {
+    localStorage.setItem('kisan_animals', JSON.stringify(animals));
+  }, [animals]);
+
+  useEffect(() => {
+    localStorage.setItem('kisan_tasks', JSON.stringify(tasks));
+  }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem('kisan_finances', JSON.stringify(finances));
+  }, [finances]);
+
+  useEffect(() => {
+    localStorage.setItem('kisan_inventory', JSON.stringify(inventory));
+  }, [inventory]);
 
   // Fetch weather data when profile location is available
   useEffect(() => {
@@ -230,6 +510,11 @@ export default function App() {
 
   // Action handlers
   const handleOpenAction = (actionId: string, sampleId?: string, query?: string) => {
+    if (actionId === 'livestock') {
+      setLivestockInitialTab(sampleId || 'overview');
+      setActiveModal('livestock');
+      return;
+    }
     setModalSampleId(sampleId);
     setModalQuery(query);
     setActiveModal(actionId);
@@ -279,6 +564,164 @@ export default function App() {
     });
   };
 
+  const handleSaveAnimal = (animal: Animal) => {
+    setAnimals((prev) => {
+      const exists = prev.some((a) => a.id === animal.id);
+      return exists ? prev.map((a) => (a.id === animal.id ? animal : a)) : [animal, ...prev];
+    });
+    if (profile?.uid) {
+      FarmDataSyncService.saveAnimal(profile.uid, animal).catch((err) =>
+        console.warn('Sync animal error:', err)
+      );
+    }
+  };
+
+  const handleDeleteAnimal = (animalId: string) => {
+    setAnimals((prev) => prev.filter((a) => a.id !== animalId));
+    if (activeAnimalId === animalId) {
+      setActiveAnimalId(animals.find((a) => a.id !== animalId)?.id || '');
+    }
+    if (profile?.uid) {
+      FarmDataSyncService.deleteAnimal(profile.uid, animalId).catch((err) =>
+        console.warn('Delete animal error:', err)
+      );
+    }
+  };
+
+  const handleSaveTask = (task: FarmTask) => {
+    setTasks((prev) => {
+      const exists = prev.some((t) => t.id === task.id);
+      return exists ? prev.map((t) => (t.id === task.id ? task : t)) : [task, ...prev];
+    });
+    if (profile?.uid) {
+      FarmDataSyncService.saveTask(profile.uid, task).catch((err) =>
+        console.warn('Sync task error:', err)
+      );
+    }
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    if (profile?.uid) {
+      FarmDataSyncService.deleteTask(profile.uid, taskId).catch((err) =>
+        console.warn('Delete task error:', err)
+      );
+    }
+  };
+
+  const handleSaveFinanceRecord = (record: FinanceRecord) => {
+    setFinances((prev) => {
+      const exists = prev.some((r) => r.id === record.id);
+      return exists ? prev.map((r) => (r.id === record.id ? record : r)) : [record, ...prev];
+    });
+    if (profile?.uid) {
+      FarmDataSyncService.saveFinanceRecord(profile.uid, record).catch((err) =>
+        console.warn('Sync finance error:', err)
+      );
+    }
+  };
+
+  const handleDeleteFinanceRecord = (recordId: string) => {
+    setFinances((prev) => prev.filter((r) => r.id !== recordId));
+    if (profile?.uid) {
+      FarmDataSyncService.deleteFinanceRecord(profile.uid, recordId).catch((err) =>
+        console.warn('Delete finance error:', err)
+      );
+    }
+  };
+
+  const handleSaveInventoryItem = (item: InventoryItem) => {
+    setInventory((prev) => {
+      const exists = prev.some((i) => i.id === item.id);
+      return exists ? prev.map((i) => (i.id === item.id ? item : i)) : [item, ...prev];
+    });
+    if (profile?.uid) {
+      FarmDataSyncService.saveInventoryItem(profile.uid, item).catch((err) =>
+        console.warn('Sync inventory error:', err)
+      );
+    }
+  };
+
+  const handleDeleteInventoryItem = (itemId: string) => {
+    setInventory((prev) => prev.filter((i) => i.id !== itemId));
+    if (profile?.uid) {
+      FarmDataSyncService.deleteInventoryItem(profile.uid, itemId).catch((err) =>
+        console.warn('Delete inventory error:', err)
+      );
+    }
+  };
+
+  // Animal sub-record handlers
+  const handleSaveHealthCheck = (check: AnimalHealthCheck) => {
+    const target = animals.find((a) => a.id === check.animalId);
+    if (!target) return;
+    const updated: Animal = {
+      ...target,
+      healthRecords: [check, ...(target.healthRecords || [])],
+      updatedAt: new Date().toISOString(),
+    };
+    handleSaveAnimal(updated);
+  };
+
+  const handleSaveVaccination = (vac: AnimalVaccination) => {
+    const target = animals.find((a) => a.id === vac.animalId);
+    if (!target) return;
+    const updated: Animal = {
+      ...target,
+      vaccinations: [vac, ...(target.vaccinations || [])],
+      updatedAt: new Date().toISOString(),
+    };
+    handleSaveAnimal(updated);
+  };
+
+  const handleSaveTreatment = (treat: AnimalTreatment) => {
+    const target = animals.find((a) => a.id === treat.animalId);
+    if (!target) return;
+    const updated: Animal = {
+      ...target,
+      treatments: [treat, ...(target.treatments || [])],
+      updatedAt: new Date().toISOString(),
+    };
+    handleSaveAnimal(updated);
+  };
+
+  const handleSaveMilkRecord = (rec: MilkRecord) => {
+    const target = animals.find((a) => a.id === rec.animalId);
+    if (!target) return;
+    const totalToday = (rec.morningLiters || 0) + (rec.eveningLiters || 0);
+    const updated: Animal = {
+      ...target,
+      dailyMilkLiters: totalToday > 0 ? totalToday : target.dailyMilkLiters,
+      milkRecords: [rec, ...(target.milkRecords || [])],
+      updatedAt: new Date().toISOString(),
+    };
+    handleSaveAnimal(updated);
+  };
+
+  const handleSaveFeedRecord = (rec: AnimalFeedRecord) => {
+    const target = animals.find((a) => a.id === rec.animalId);
+    if (!target) return;
+    const updated: Animal = {
+      ...target,
+      feedRecords: [rec, ...(target.feedRecords || [])],
+      updatedAt: new Date().toISOString(),
+    };
+    handleSaveAnimal(updated);
+  };
+
+  const handleSaveBreedingRecord = (rec: BreedingRecord) => {
+    const target = animals.find((a) => a.id === rec.animalId);
+    if (!target) return;
+    const updated: Animal = {
+      ...target,
+      breedingRecords: [rec, ...(target.breedingRecords || [])],
+      pregnancyStatus: rec.result === 'conceived' ? 'pregnant' : target.pregnancyStatus,
+      expectedDeliveryDate: rec.expectedCalvingDate || target.expectedDeliveryDate,
+      updatedAt: new Date().toISOString(),
+    };
+    handleSaveAnimal(updated);
+  };
+
   // 1. App Startup Authentication Loading Screen
   if (isAuthChecking) {
     return (
@@ -319,6 +762,7 @@ export default function App() {
         onLanguageChange={setLanguage}
         profile={profile}
         onOpenFarmModal={() => handleOpenAction('my_farm')}
+        onOpenFieldSelector={() => setActiveModal('select_field')}
         onStartDemoTour={() => handleOpenAction('demo_tour')}
         isAudioMuted={isAudioMuted}
         onToggleAudioMute={() => setIsAudioMuted(!isAudioMuted)}
@@ -340,6 +784,14 @@ export default function App() {
             setActiveModal('auth');
           }}
           onEditProfile={() => setActiveModal('onboarding')}
+          onOpenFieldSelector={() => setActiveModal('select_field')}
+          animals={animals}
+          activeAnimalId={activeAnimalId}
+          onOpenAnimalSelector={() => setActiveModal('select_animal')}
+          taskCount={tasks.filter((t) => !t.isCompleted).length}
+          inventoryAlertCount={
+            inventory.filter((i) => i.minimumThreshold !== undefined && i.quantity <= i.minimumThreshold).length
+          }
         />
       </main>
 
@@ -399,6 +851,26 @@ export default function App() {
           onSaveToDiary={handleSaveToDiary}
           onOpenExpert={() => handleOpenAction('ask_expert')}
           initialSampleId={modalSampleId}
+          onSelectField={(id) => {
+            setProfile((prev) => (prev ? { ...prev, activeFieldId: id } : prev));
+            if (profile.uid) {
+              FarmDataSyncService.saveUserProfile(profile.uid, {
+                activeFieldId: id,
+                updatedAt: new Date().toISOString(),
+              }).catch(console.warn);
+            }
+          }}
+          onUpdateField={(updatedField) => {
+            setProfile((prev) => {
+              if (!prev) return prev;
+              const newFields = prev.fields.map((f) => (f.id === updatedField.id ? updatedField : f));
+              const newProf = { ...prev, fields: newFields };
+              if (newProf.uid) {
+                FarmDataSyncService.saveField(newProf.uid, updatedField).catch(console.warn);
+              }
+              return newProf;
+            });
+          }}
         />
       )}
 
@@ -430,6 +902,37 @@ export default function App() {
           onClose={handleCloseModal}
           onNavigateAction={handleOpenAction}
           initialQuery={modalQuery}
+          onSelectField={(id) => {
+            setProfile((prev) => (prev ? { ...prev, activeFieldId: id } : prev));
+            if (profile.uid) {
+              FarmDataSyncService.saveUserProfile(profile.uid, {
+                activeFieldId: id,
+                updatedAt: new Date().toISOString(),
+              }).catch(console.warn);
+            }
+          }}
+        />
+      )}
+
+      {activeModal === 'select_field' && (
+        <FieldSelectorModal
+          language={language}
+          fields={profile.fields}
+          activeFieldId={profile.activeFieldId || profile.fields[0]?.id || ''}
+          onSelectField={(id) => {
+            setProfile((prev) => (prev ? { ...prev, activeFieldId: id } : prev));
+            if (profile.uid) {
+              FarmDataSyncService.saveUserProfile(profile.uid, {
+                activeFieldId: id,
+                updatedAt: new Date().toISOString(),
+              }).catch(console.warn);
+            }
+            setActiveModal(null);
+          }}
+          onAddNewField={() => {
+            setActiveModal('my_farm');
+          }}
+          onClose={() => setActiveModal(null)}
         />
       )}
 
@@ -594,6 +1097,86 @@ export default function App() {
             }
             handleCloseModal();
           }}
+        />
+      )}
+
+      {/* Animal Selector Modal */}
+      {activeModal === 'select_animal' && (
+        <AnimalSelectorModal
+          isOpen={true}
+          animals={animals}
+          activeAnimalId={activeAnimalId}
+          onSelectAnimal={(id) => {
+            setActiveAnimalId(id);
+            setActiveModal(null);
+          }}
+          onAddNewAnimal={() => {
+            setActiveModal('livestock');
+          }}
+          onClose={handleCloseModal}
+        />
+      )}
+
+      {/* Livestock Management Modal */}
+      {activeModal === 'livestock' && (
+        <LivestockModal
+          isOpen={true}
+          onClose={handleCloseModal}
+          initialTab={livestockInitialTab as any}
+          animals={animals}
+          activeAnimalId={activeAnimalId}
+          onSelectActiveAnimal={(id) => setActiveAnimalId(id)}
+          onSaveAnimal={handleSaveAnimal}
+          onDeleteAnimal={handleDeleteAnimal}
+          onSaveHealthCheck={handleSaveHealthCheck}
+          onSaveVaccination={handleSaveVaccination}
+          onSaveTreatment={handleSaveTreatment}
+          onSaveMilkRecord={handleSaveMilkRecord}
+          onSaveFeedRecord={handleSaveFeedRecord}
+          onSaveBreedingRecord={handleSaveBreedingRecord}
+          onAddTask={handleSaveTask}
+          onOpenExpert={() => handleOpenAction('ask_expert')}
+          language={language}
+        />
+      )}
+
+      {/* Farming Calendar & Reminders Modal */}
+      {activeModal === 'calendar' && (
+        <FarmingCalendarModal
+          isOpen={true}
+          onClose={handleCloseModal}
+          tasks={tasks}
+          onSaveTask={handleSaveTask}
+          onDeleteTask={handleDeleteTask}
+          fields={profile.fields}
+          animals={animals}
+          activeFieldId={profile.activeFieldId}
+          activeAnimalId={activeAnimalId}
+        />
+      )}
+
+      {/* Farm Finance Modal */}
+      {activeModal === 'finance' && (
+        <FarmFinanceModal
+          isOpen={true}
+          onClose={handleCloseModal}
+          finances={finances}
+          onSaveRecord={handleSaveFinanceRecord}
+          onDeleteRecord={handleDeleteFinanceRecord}
+          fields={profile.fields}
+          animals={animals}
+          activeFieldId={profile.activeFieldId}
+        />
+      )}
+
+      {/* Farm Inventory / Stock Modal */}
+      {activeModal === 'inventory' && (
+        <FarmInventoryModal
+          isOpen={true}
+          onClose={handleCloseModal}
+          inventory={inventory}
+          onSaveItem={handleSaveInventoryItem}
+          onDeleteItem={handleDeleteInventoryItem}
         />
       )}
     </div>

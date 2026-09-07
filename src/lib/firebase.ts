@@ -261,6 +261,13 @@ export const FarmDataSyncService = {
     }
   },
 
+  // Save multiple fields
+  async saveFields(userId: string, fields: Record<string, any>[]) {
+    for (const field of fields) {
+      await this.saveField(userId, field);
+    }
+  },
+
   // Delete a field
   async deleteField(userId: string, fieldId: string) {
     const path = `users/${userId}/fields/${fieldId}`;
@@ -303,6 +310,184 @@ export const FarmDataSyncService = {
   // Delete diary entry
   async deleteDiaryEntry(userId: string, entryId: string) {
     const path = `users/${userId}/diary/${entryId}`;
+    try {
+      await deleteDoc(doc(db, path));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // ==================== ANIMALS / LIVESTOCK ====================
+  // Listen to farmer's animals
+  subscribeAnimals(userId: string, onUpdate: (animals: any[]) => void): Unsubscribe {
+    const path = `users/${userId}/animals`;
+    return onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        onUpdate(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveAnimal(userId: string, animal: Record<string, any>) {
+    const path = `users/${userId}/animals/${animal.id}`;
+    try {
+      const cleanData = sanitizeForFirestore({
+        ...animal,
+        userId,
+      });
+      await setDoc(doc(db, path), cleanData, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteAnimal(userId: string, animalId: string) {
+    const path = `users/${userId}/animals/${animalId}`;
+    try {
+      await deleteDoc(doc(db, path));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Animal Sub-records (Milk, Health, Vaccinations, Treatments, Feed, Breeding)
+  subscribeAnimalSubcollection(userId: string, animalId: string, subcollectionName: string, onUpdate: (items: any[]) => void): Unsubscribe {
+    const path = `users/${userId}/animals/${animalId}/${subcollectionName}`;
+    return onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        onUpdate(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveAnimalSubRecord(userId: string, animalId: string, subcollectionName: string, record: Record<string, any>) {
+    const path = `users/${userId}/animals/${animalId}/${subcollectionName}/${record.id}`;
+    try {
+      const cleanData = sanitizeForFirestore({
+        ...record,
+        animalId,
+        userId,
+      });
+      await setDoc(doc(db, path), cleanData, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  // ==================== SMART FARMING CALENDAR / TASKS ====================
+  subscribeTasks(userId: string, onUpdate: (tasks: any[]) => void): Unsubscribe {
+    const path = `users/${userId}/tasks`;
+    return onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        onUpdate(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveTask(userId: string, task: Record<string, any>) {
+    const path = `users/${userId}/tasks/${task.id}`;
+    try {
+      const cleanData = sanitizeForFirestore({
+        ...task,
+        userId,
+      });
+      await setDoc(doc(db, path), cleanData, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteTask(userId: string, taskId: string) {
+    const path = `users/${userId}/tasks/${taskId}`;
+    try {
+      await deleteDoc(doc(db, path));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // ==================== FARM FINANCE (EXPENSES & INCOME) ====================
+  subscribeFinances(userId: string, onUpdate: (records: any[]) => void): Unsubscribe {
+    const path = `users/${userId}/finances`;
+    return onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        onUpdate(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveFinanceRecord(userId: string, record: Record<string, any>) {
+    const path = `users/${userId}/finances/${record.id}`;
+    try {
+      const cleanData = sanitizeForFirestore({
+        ...record,
+        userId,
+      });
+      await setDoc(doc(db, path), cleanData, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteFinanceRecord(userId: string, recordId: string) {
+    const path = `users/${userId}/finances/${recordId}`;
+    try {
+      await deleteDoc(doc(db, path));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // ==================== FARM INVENTORY / STOCK ====================
+  subscribeInventory(userId: string, onUpdate: (items: any[]) => void): Unsubscribe {
+    const path = `users/${userId}/inventory`;
+    return onSnapshot(
+      collection(db, path),
+      (snapshot) => {
+        const items = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        onUpdate(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, path);
+      }
+    );
+  },
+
+  async saveInventoryItem(userId: string, item: Record<string, any>) {
+    const path = `users/${userId}/inventory/${item.id}`;
+    try {
+      const cleanData = sanitizeForFirestore({
+        ...item,
+        userId,
+      });
+      await setDoc(doc(db, path), cleanData, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  },
+
+  async deleteInventoryItem(userId: string, itemId: string) {
+    const path = `users/${userId}/inventory/${itemId}`;
     try {
       await deleteDoc(doc(db, path));
     } catch (error) {

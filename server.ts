@@ -370,18 +370,53 @@ function getVoiceReplyFallback(query: string, farmContext: any, language: string
   const isHi = language === 'hi';
 
   const lower = query.toLowerCase();
+  const crop = (farmContext?.crop || '').toLowerCase();
+  const fieldName = farmContext?.fieldName || (isMr ? 'सध्याचे शेत' : 'Current Field');
+
   let intent = 'GENERAL_ADVICE';
-  let spoken = isMr ? 'नमस्कार शेतकरी बंधू, मी तुमचा कृषी मित्र आहे.' : isHi ? 'नमस्ते किसान भाई, मैं आपका कृषि मित्र हूँ।' : 'Hello farmer friend, I am your agricultural assistant.';
+  let spoken = isMr ? `नमस्कार शेतकरी बंधू, मी ${fieldName} वरील ${farmContext?.crop || 'पिकासाठी'} तुमचा कृषी मित्र आहे.` : isHi ? `नमस्ते किसान भाई, मैं ${fieldName} की ${farmContext?.crop || 'फसल'} के लिए आपका कृषि मित्र हूँ।` : `Hello farmer friend, I am your agricultural assistant for ${fieldName} (${farmContext?.crop || 'crop'}).`;
   let detailed = spoken;
   let buttons: any[] = [{ label: isMr ? '📸 पीक तपासा' : isHi ? '📸 फसल जांचें' : '📸 Scan Crop', actionType: 'SCAN_CROP' }];
 
-  if (lower.includes('पिवळ') || lower.includes('पीले') || lower.includes('yellow')) {
+  if (lower.includes('बोरर') || lower.includes('borer') || lower.includes('अळी') || lower.includes('इल्ली') || lower.includes('कीड') || lower.includes('फवारणी') || lower.includes('spray')) {
+    intent = 'CROP_DISEASE';
+    if (crop.includes('ऊस') || crop.includes('sugar')) {
+      spoken = isMr
+        ? `${fieldName} मधील उसावर खोड कीड (Dead heart) असल्यास क्लोरँट्रानिलीप्रोल (कोराजन १८.५% एससी) ०.४ मिली प्रति लिटर पाण्यात मिसळून आळवणी (Drenching) करा किंवा फर्टेरा ७.५ किलो एकरी टाका.`
+        : isHi
+        ? `${fieldName} में गन्ने पर कंसुआ/प्ररोह बेधक (Shoot borer) के लिए कोराजन 0.4 मिली/लीटर पानी से ड्रेन्चिंग करें या फर्टेरा 7.5 किग्रा प्रति एकड़ दें।`
+        : `For sugarcane shoot borer in ${fieldName}, drench Chlorantraniliprole 18.5% SC @ 0.4 ml/L or apply Ferterra 7.5 kg/acre.`;
+    } else if (crop.includes('सोयाबीन') || crop.includes('soybean')) {
+      spoken = isMr
+        ? `${fieldName} मधील सोयाबीनवर चक्रीभुंगा किंवा शेंगा पोखरणाऱ्या अळीसाठी क्लोराँट्रानिलीप्रोल १८.५% एससी ०.३ मिली किंवा थायामेथोक्साम + लॅम्बडा सायहेलोथ्रीन ०.५ मिली प्रति लिटर फवारा.`
+        : isHi
+        ? `${fieldName} में सोयाबीन पर गर्डल बीटल या फलियों की इल्ली के लिए क्लोरेंट्रानिलिप्रोल 0.3 मिली या थायमेथॉक्सम+लैम्ब्डा 0.5 मिली प्रति लीटर छिड़कें।`
+        : `For soybean girdle beetle or pod borer in ${fieldName}, spray Chlorantraniliprole 18.5% SC @ 0.3 ml/L or Thiamethoxam + Lambda @ 0.5 ml/L.`;
+    } else if (crop.includes('कांदा') || crop.includes('onion')) {
+      spoken = isMr
+        ? `${fieldName} मधील कांद्यावर फुलकिडे (थ्रिप्स) व करपा नियंत्रणासाठी फिप्रोनिल ५% एससी १.५ मिली + मँकोझेब २.५ ग्रॅम प्रति लिटर पाणी + स्टिकर मिसळून फवारा.`
+        : isHi
+        ? `${fieldName} में प्याज पर थ्रिप्स एवं करपा के लिए फिप्रोनिल 5% SC 1.5 मिली + मैंकोजेब 2.5 ग्राम प्रति लीटर पानी मिलाकर छिड़कें।`
+        : `For onion thrips and purple blotch in ${fieldName}, spray Fipronil 5% SC @ 1.5 ml + Mancozeb @ 2.5 g/L with sticker.`;
+    } else {
+      spoken = isMr
+        ? `${fieldName} वरील किडीच्या नियंत्रणासाठी ५% निंबोळी अर्क फवारा. प्रादुर्भाव जास्त असल्यास जवळून एक फोटो काढून अचूक खात्री करा.`
+        : isHi
+        ? `${fieldName} पर कीट नियंत्रण के लिए 5% नीम अर्क छिड़कें या सटीक पहचान के लिए एक फोटो लें।`
+        : `For pest control in ${fieldName}, spray 5% neem extract or scan a photo for targeted recommendation.`;
+    }
+    detailed = spoken;
+    buttons = [
+      { label: isMr ? '📸 पिकाचा फोटो काढा' : isHi ? '📸 फोटो लें' : '📸 Scan Photo', actionType: 'SCAN_CROP' },
+      { label: isMr ? '📞 तज्ज्ञांशी बोला' : isHi ? '📞 विशेषज्ञ से बात करें' : '📞 Call Expert', actionType: 'CALL_EXPERT' },
+    ];
+  } else if (lower.includes('पिवळ') || lower.includes('पीले') || lower.includes('yellow')) {
     intent = 'CROP_DISEASE';
     spoken = isMr
-      ? 'पाने पिवळी पडत असल्यास नत्र (युरिया) ची कमतरता किंवा खालच्या बाजूला रसशोषक किडी असू शकतात. पानाचा एक फोटो काढून खात्री करा.'
+      ? `${fieldName} मधील ${farmContext?.crop || 'पिकाची'} पाने पिवळी पडत असल्यास नत्र (युरिया) ची कमतरता किंवा रसशोषक किडी असू शकतात. पानाचा एक फोटो काढून खात्री करा.`
       : isHi
-      ? 'पत्तियां पीली पड़ने का कारण नाइट्रोजन की कमी या रस चूसक कीट हो सकते हैं। कृपया पत्ती का एक फोटो लेकर जांचें।'
-      : 'Yellowing leaves usually indicate nitrogen deficiency or sucking pest infestation. Please take a closeup photo.';
+      ? `${fieldName} में ${farmContext?.crop || 'फसल'} की पत्तियां पीली पड़ने पर नाइट्रोजन कमी या रस चूसक कीट हो सकते हैं। कृपया एक फोटो लेकर जांचें।`
+      : `In ${fieldName} (${farmContext?.crop || 'crop'}), yellowing leaves usually indicate nitrogen deficiency or sucking pests. Please scan a leaf photo.`;
     detailed = spoken;
     buttons = [
       { label: isMr ? '📸 पानाचा फोटो काढा' : isHi ? '📸 पत्ती की फोटो लें' : '📸 Scan Leaf', actionType: 'SCAN_CROP' },
@@ -390,10 +425,10 @@ function getVoiceReplyFallback(query: string, farmContext: any, language: string
   } else if (lower.includes('खत') || lower.includes('खाद') || lower.includes('fertilizer') || lower.includes('dap') || lower.includes('युरिया')) {
     intent = 'FERTILIZER_INQUIRY';
     spoken = isMr
-      ? 'खत देण्याआधी जमिनीचा ओलावा तपासा. कोरड्या जमिनीत रासायनिक खते दिल्यास मुळे जळण्याचा धोका असतो.'
+      ? `${fieldName} मधील ${farmContext?.crop || 'पिकासाठी'} खत देण्याआधी जमिनीचा ओलावा तपासा. आधी दिलेले खत: ${farmContext?.previousFertilizerUsed || 'काही नाही'}.`
       : isHi
-      ? 'खाद देने से पहले मिट्टी में नमी जरूर जांचें। सूखी मिट्टी में खाद न दें।'
-      : 'Ensure adequate soil moisture before fertilizer application to prevent root burn.';
+      ? `${fieldName} में ${farmContext?.crop || 'फसल'} के लिए खाद देने से पहले नमी जांचें। पहले दी गई खाद: ${farmContext?.previousFertilizerUsed || 'कोई नहीं'}।`
+      : `For ${farmContext?.crop || 'crop'} in ${fieldName}, check soil moisture before fertilizing. Previous fertilizer: ${farmContext?.previousFertilizerUsed || 'None'}.`;
     detailed = spoken;
     buttons = [
       { label: isMr ? '🧪 खत सुरक्षा तपासा' : isHi ? '🧪 खाद सुरक्षा जांचें' : '🧪 Check Fertilizer', actionType: 'CHECK_FERTILIZER' },
@@ -408,6 +443,55 @@ function getVoiceReplyFallback(query: string, farmContext: any, language: string
     detailed = spoken;
     buttons = [
       { label: isMr ? '⛅ हवामान अंदाज' : isHi ? '⛅ मौसम पूर्वानुमान' : '⛅ View Weather', actionType: 'VIEW_WEATHER' },
+    ];
+  } else if (
+    lower.includes('गाय') ||
+    lower.includes('म्हैस') ||
+    lower.includes('शेळी') ||
+    lower.includes('बैल') ||
+    lower.includes('वासरू') ||
+    lower.includes('cow') ||
+    lower.includes('buffalo') ||
+    lower.includes('goat') ||
+    lower.includes('animal') ||
+    lower.includes('livestock') ||
+    lower.includes('पशू') ||
+    lower.includes('जनावर') ||
+    lower.includes('चारा खात नाही') ||
+    lower.includes('दूध कमी') ||
+    lower.includes('खोकला')
+  ) {
+    intent = 'LIVESTOCK_INQUIRY';
+    if (lower.includes('चारा') || lower.includes('खात नाही') || lower.includes('not eating')) {
+      spoken = isMr
+        ? 'जनावर चारा खात नसल्यास तापमान (ताप) व पोट फुगले आहे का ते तपासा. स्वच्छ पिण्याचे पाणी द्या. लक्षणे कायम राहिल्यास तात्काळ पशुवैद्यकीय डॉक्टरांना बोलवा.'
+        : isHi
+        ? 'पशु चारा नहीं खा रहा है तो बुखार और पेट का फूलना जांचें। साफ पानी दें। लक्षण बने रहने पर पशु चिकित्सक को दिखाएं।'
+        : 'If the animal is off-feed, check for fever or bloat. Provide clean water and consult a qualified veterinarian if symptoms persist.';
+    } else if (lower.includes('दूध') || lower.includes('milk')) {
+      spoken = isMr
+        ? 'दूध अचानक कमी होण्याची कारणे: कासदाह (मॅस्टायटिस), ताप, पौष्टिक आहाराची कमतरता किंवा पाण्याचा ताण असू शकतात. कासेला सूज किंवा गाठी आहेत का ते तपासा.'
+        : isHi
+        ? 'दूध अचानक कम होने के कारण: थनैला (मैस्टाइटिस), बुखार, या संतुलित आहार की कमी हो सकते हैं। अयन पर सूजन या गांठ की जांच करें।'
+        : 'Sudden milk drop may indicate mastitis, fever, or nutritional stress. Check udder for warmth, swelling, or clots in milk.';
+    } else if (lower.includes('खोकला') || lower.includes('cough')) {
+      spoken = isMr
+        ? 'जनावराला खोकला व धाप लागत असल्यास गोठा कोरडा व हवेशीर ठेवा. नाक व डोळ्यातून स्राव येतोय का ते पहा. तात्काळ पशु डॉक्टरांचा सल्ला घ्या.'
+        : isHi
+        ? 'पशु को खांसी या सांस लेने में तकलीफ हो तो बाड़े को सूखा रखें और तुरंत पशु चिकित्सक से संपर्क करें।'
+        : 'If the animal is coughing or has labored breathing, ensure dry ventilation and seek prompt veterinary evaluation.';
+    } else {
+      spoken = isMr
+        ? 'पशुधनाच्या आरोग्यासाठी व उत्पादकतेसाठी नियमित लसीकरण व संतुलित आहार ठेवा. लक्षणे असल्यास आरोग्य तपासणी करा.'
+        : isHi
+        ? 'पशु स्वास्थ्य और उत्पादकता के लिए नियमित टीकाकरण और संतुलित आहार रखें।'
+        : 'For animal health and productivity, ensure timely vaccination and balanced nutrition.';
+    }
+    detailed = spoken;
+    buttons = [
+      { label: isMr ? '🩺 पशु आरोग्य तपासा' : isHi ? '🩺 पशु स्वास्थ्य जांचें' : '🩺 Check Animal Health', actionType: 'CHECK_ANIMAL_HEALTH' },
+      { label: isMr ? '🥛 दुग्ध नोंद तपासा' : isHi ? '🥛 दूध रिकॉर्ड' : '🥛 Log Milk', actionType: 'LOG_MILK' },
+      { label: isMr ? '🐄 गोपालन विभाग' : isHi ? '🐄 पशुपालन विभाग' : '🐄 Livestock Hub', actionType: 'VIEW_LIVESTOCK' },
     ];
   }
 
@@ -852,13 +936,27 @@ app.post('/api/voice/assistant', async (req: Request, res: Response) => {
 Farmer's spoken query: "${speechText}"
 Target Language: ${langName}
 
-Farm Memory & Context:
-- Active Farm/Field: ${farmContext?.fieldName || 'Main Field'}
-- Crop: ${farmContext?.crop || 'Cotton / कापूस'}
+Farm Memory & Field Context:
+- Active Field Name: ${farmContext?.fieldName || 'Main Field'}
+- Crop on THIS Field: ${farmContext?.crop || 'Cotton / कापूस'}
+- Crop Variety: ${farmContext?.variety || 'Not specified'}
+- Field Area: ${farmContext?.acreage || 1} ${farmContext?.acreageUnit || 'Acres'}
 - Growth Stage: ${farmContext?.cropStage || 'Vegetative'}
 - Sowing Date: ${farmContext?.sowingDate || 'Recent'}
-- Recent Fertilizers: ${JSON.stringify(farmContext?.fertilizers || ['Urea applied 15 days ago'])}
+- Soil Type: ${farmContext?.soilType || 'Black soil'}
 - Soil Health: ${farmContext?.soilSummary || 'Medium black soil, medium organic carbon'}
+- Current Planned Fertilizer: ${farmContext?.currentPlannedFertilizer || 'None'}
+- Previous Fertilizer Used: ${farmContext?.previousFertilizerUsed || 'None'}
+- Current Crop Problem in THIS Field: ${farmContext?.currentCropProblem || 'None'}
+- Recent Fertilizers: ${JSON.stringify(farmContext?.fertilizers || [])}
+- Farmer's Location: ${farmContext?.location?.village || ''}, ${farmContext?.location?.district || ''}
+
+CRITICAL MULTI-FIELD ISOLATION DIRECTIVE:
+A farmer can have multiple fields with completely different crops (e.g. Field 1 = Sugarcane, Field 2 = Soybean, Field 3 = Onion, Field 4 = Wheat).
+The farmer is currently asking about their ACTIVE FIELD: "${farmContext?.fieldName}" which has crop: "${farmContext?.crop}".
+- ALWAYS address the active field's specific crop ("${farmContext?.crop}") and NEVER confuse or mix it with other crops.
+- If the farmer asks "What spray should I do?" or "कीड नियंत्रण काय करावे?", prescribe scientifically verified recommendations specifically for "${farmContext?.crop}" at growth stage "${farmContext?.cropStage}".
+- Mention the field name "${farmContext?.fieldName}" or crop name "${farmContext?.crop}" in the spoken opening so the farmer knows which field you are answering for.
 
 Behavior Guidelines:
 1. Speak in warm, conversational, respectful spoken ${langName} (use "तुम्ही/आप", "शेतकरी बंधू", "किसान भाई").
@@ -909,6 +1007,194 @@ Return STRICT JSON:
       success: true,
       reply: getVoiceReplyFallback(req.body?.speechText || '', req.body?.farmContext, req.body?.language || 'mr'),
       source: 'agronomy_rule_engine',
+    });
+  }
+});
+
+// Helper: Animal Health Fallback
+function getAnimalHealthFallback(symptoms: string, animal: any, language: string = 'mr') {
+  const isMr = language === 'mr';
+  const isHi = language === 'hi';
+  const lower = (symptoms || '').toLowerCase();
+  const isEmergency =
+    lower.includes('श्वास') ||
+    lower.includes('दम') ||
+    lower.includes('रक्त') ||
+    lower.includes('उठत नाही') ||
+    lower.includes('convulsion') ||
+    lower.includes('विष') ||
+    lower.includes('फुग') ||
+    lower.includes('bloat') ||
+    lower.includes('खडे') ||
+    lower.includes('अडचणी');
+
+  return {
+    possibleCauses: [
+      isMr
+        ? "अपचन किंवा ऋतुबदलामुळे पोटाचे विकार (Indigestion or feed change stress)"
+        : isHi
+        ? "पाचन विकार या मौसम बदलाव का तनाव"
+        : "Digestive disorder or sudden feed change stress",
+      isMr
+        ? "सौम्य विषाणू किंवा जंतू संसर्ग (Mild infection or seasonal fever)"
+        : isHi
+        ? "हल्का संक्रमण या मौसमी बुखार"
+        : "Mild bacterial/viral infection or seasonal stress",
+    ],
+    whatToCheck: [
+      isMr
+        ? "जनावराची रवंथ (Rumination) चालू आहे की बंद आहे ते पाहा."
+        : isHi
+        ? "पशु जुगाली कर रहा है या नहीं देखें।"
+        : "Observe if rumination (chewing cud) is active or stopped.",
+      isMr
+        ? "नाकावर पाण्याचे थेंब (ओले नाक) आहेत का; नाक कोरडे असणे तापाचे लक्षण असू शकते."
+        : isHi
+        ? "नाक गीला है या सूखा देखें; सूखा नाक बुखार का संकेत हो सकता है।"
+        : "Check muzzle moisture; dry muzzle can indicate fever.",
+      isMr
+        ? "शेणाचा रंग, पातळपणा आणि वास तपासा."
+        : isHi
+        ? "गोबर का रंग और पतलापन जांचें।"
+        : "Inspect consistency and smell of dung.",
+    ],
+    safeNextSteps: [
+      isMr
+        ? "जनावराला स्वच्छ, सावलीच्या आणि कोरड्या जागेवर आराम करू द्या."
+        : isHi
+        ? "पशु को छायादार, सूखी और हवादार जगह पर रखें।"
+        : "Keep animal in a clean, shaded, and well-ventilated dry area.",
+      isMr
+        ? "स्वच्छ, ताजे आणि थोडे कोमट पाणी पिण्यास उपलब्ध ठेवा."
+        : isHi
+        ? "साफ और ताजा पीने का पानी उपलब्ध कराएं।"
+        : "Provide fresh, clean, lukewarm drinking water.",
+      isMr
+        ? "पचायला सोपा कोवळा हिरवा चारा थोड्या प्रमाणात द्या, तेलकट किंवा आंबट खाद्य टाळा."
+        : isHi
+        ? "आसानी से पचने वाला ताजा हरा चारा थोड़ी मात्रा में दें।"
+        : "Offer small quantities of succulent green fodder; avoid heavy concentrates.",
+    ],
+    warningSigns: [
+      isMr
+        ? "पोट डाव्या बाजूने गच्च फुगणे (Tympanites/Bloat)"
+        : isHi
+        ? "पेट तेजी से फूलना (अफरा / Bloat)"
+        : "Severe swelling on left flank (Bloat)",
+      isMr
+        ? "जनावर खाली बसून राहणे आणि उठण्यास असमर्थ असणे (Downer cow syndrome)"
+        : isHi
+        ? "पशु का जमीन पर बैठ जाना और उठ न पाना"
+        : "Inability to stand or severe weakness",
+      isMr
+        ? "तोंडातून फेस, सतत श्वास घेण्यास अडचण किंवा शरीराचे तापमान १०३°F पेक्षा जास्त असणे"
+        : isHi
+        ? "मुंह से झाग, तेज सांस या 103°F से अधिक तेज बुखार"
+        : "Frothing at mouth, rapid laboured breathing, or fever over 103°F",
+    ],
+    isEmergency,
+    emergencyReason: isEmergency
+      ? isMr
+        ? "गंभीर लक्षणे दिसत आहेत. घरगुती उपायांत वेळ न घालवता ताबडतोब पशुवैद्यकीय डॉक्टरांना बोलवा!"
+        : isHi
+        ? "गंभीर लक्षण! बिना देर किए तुरंत पशु चिकित्सक को बुलाएं।"
+        : "Critical symptoms detected. Call a licensed veterinarian immediately without delay!"
+      : null,
+    veterinaryHelpRecommended: true,
+  };
+}
+
+// 4.5 CATTLE & LIVESTOCK HEALTH EVALUATION API (Part 12 & 13)
+app.post('/api/ai/animal-health', async (req: Request, res: Response) => {
+  try {
+    const { animal, symptoms, duration, feedWaterIntake, temperature, milkDrop, imageBase64, language = 'mr' } = req.body;
+
+    const fallback = getAnimalHealthFallback(symptoms, animal, language);
+
+    const ai = getGemini();
+    if (!ai) {
+      return res.json({
+        success: true,
+        healthCheck: fallback,
+        source: 'veterinary_rule_engine',
+      });
+    }
+
+    const langName = language === 'mr' ? 'Marathi (मराठी)' : language === 'hi' ? 'Hindi (हिंदी)' : 'English';
+
+    const prompt = `You are an expert, compassionate Veterinary Assistant for Indian rural farmers.
+Target Language: ${langName}
+
+Animal Details:
+- Animal Name: ${animal?.name || 'Animal'}
+- Species / Type: ${animal?.type || 'Cow (गाय)'}
+- Breed: ${animal?.breed || 'Local'}
+- Age: ${animal?.ageYears || 3} years
+- Sex: ${animal?.sex || 'female'}
+- Pregnancy Status: ${animal?.pregnancyStatus || 'Unknown'}
+
+Farmer's Observation & Symptoms:
+- Primary Symptoms: "${symptoms || 'Not eating fodder / चारा खात नाही'}"
+- Duration: ${duration || '1-2 days'}
+- Feed and Water Intake: ${feedWaterIntake || 'Reduced / कमी झाले आहे'}
+- Body Temperature (if noted): ${temperature || 'Not measured'}
+- Milk Production Change: ${milkDrop || 'Normal / Not specified'}
+
+STRICT VETERINARY SAFETY RULES:
+1. NEVER claim a confirmed diagnosis from a photograph or brief description alone. Emphasize that multiple animal diseases share identical clinical signs.
+2. NEVER prescribe prescription-only veterinary antibiotics (like Enrofloxacin, Ceftriaxone) or surgical procedures for the farmer to inject themselves.
+3. CLEARLY DETECT EMERGENCIES: If symptoms include severe difficulty breathing, unable to stand (downer cow), convulsions, severe bloating/tympanites, poisoning, or birth complications, immediately flag isEmergency: true with a stark urgent warning to summon a veterinarian.
+4. Provide safe, low-risk, supportive care steps (isolation, clean water, dry bedding, withholding concentrates, palatable fodder).
+5. All texts MUST be in natural, caring, farmer-friendly ${langName}.
+
+Return STRICT JSON:
+{
+  "possibleCauses": ["string in ${langName} explaining potential cause and why it happens"],
+  "whatToCheck": ["string in ${langName} - clinical signs farmer should inspect: eyes, rumination, muzzle, dung, temperature"],
+  "safeNextSteps": ["string in ${langName} - immediate safe non-chemical supportive care"],
+  "warningSigns": ["string in ${langName} - red flag signs that demand instant doctor presence"],
+  "isEmergency": boolean,
+  "emergencyReason": "string in ${langName} or null",
+  "veterinaryHelpRecommended": true
+}`;
+
+    const parts: any[] = [];
+    if (imageBase64) {
+      const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+      parts.push({
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: cleanBase64,
+        },
+      });
+    }
+    parts.push({ text: prompt });
+
+    try {
+      const rawText = await callGeminiWithFallback(ai, {
+        contents: { parts },
+        preferredModel: 'gemini-3.1-flash-lite',
+      });
+      const parsed = cleanAndParseJson(rawText, fallback);
+      return res.json({
+        success: true,
+        healthCheck: parsed,
+        source: 'gemini',
+      });
+    } catch (aiErr: any) {
+      console.warn('[Livestock AI Notice] Using rule engine fallback:', aiErr?.message);
+      return res.json({
+        success: true,
+        healthCheck: fallback,
+        source: 'veterinary_rule_engine',
+      });
+    }
+  } catch (err: any) {
+    console.warn('Animal health route error:', err?.message);
+    return res.json({
+      success: true,
+      healthCheck: getAnimalHealthFallback(req.body?.symptoms, req.body?.animal, req.body?.language || 'mr'),
+      source: 'veterinary_rule_engine',
     });
   }
 });

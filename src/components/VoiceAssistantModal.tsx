@@ -16,6 +16,7 @@ import {
 import { Language, FarmerProfile } from '../types';
 import { translations } from '../locales/translations';
 import { createSpeechRecognizer, SpeechService } from '../utils/speech';
+import { FieldSelectorModal } from './FieldSelectorModal';
 
 interface VoiceAssistantModalProps {
   language: Language;
@@ -23,6 +24,7 @@ interface VoiceAssistantModalProps {
   onClose: () => void;
   onNavigateAction: (actionId: string) => void;
   initialQuery?: string;
+  onSelectField?: (fieldId: string) => void;
 }
 
 export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
@@ -31,9 +33,13 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
   onClose,
   onNavigateAction,
   initialQuery,
+  onSelectField,
 }) => {
   const t = translations[language];
-  const activeField = profile.fields.find((f) => f.id === profile.activeFieldId) || profile.fields[0];
+  const [activeFieldId, setActiveFieldId] = useState<string>(profile.activeFieldId || profile.fields[0]?.id || '');
+  const [isFieldSelectorOpen, setIsFieldSelectorOpen] = useState(false);
+
+  const activeField = profile.fields.find((f) => f.id === activeFieldId) || profile.fields[0];
 
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState(initialQuery || '');
@@ -128,10 +134,18 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
           farmContext: {
             fieldName: activeField?.name,
             crop: activeField?.crop,
+            variety: activeField?.variety,
+            acreage: activeField?.acreage,
+            acreageUnit: activeField?.acreageUnit,
+            soilType: activeField?.soilType,
             cropStage: activeField?.cropStage,
             sowingDate: activeField?.sowingDate,
-            fertilizers: activeField?.fertilizerHistory.map((f) => f.productName),
+            currentPlannedFertilizer: activeField?.currentPlannedFertilizer,
+            previousFertilizerUsed: activeField?.previousFertilizerUsed,
+            currentCropProblem: activeField?.currentCropProblem || activeField?.recentProblems?.[0],
+            fertilizers: activeField?.fertilizerHistory?.map((f) => f.productName) || [],
             soilSummary: activeField?.soilHealthSummary,
+            location: activeField?.location || profile.location,
           },
           language,
         }),
@@ -196,6 +210,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     else if (actionType === 'CHECK_FERTILIZER') onNavigateAction('check_fertilizer');
     else if (actionType === 'CALL_EXPERT') onNavigateAction('ask_expert');
     else if (actionType === 'LOG_DIARY') onNavigateAction('farm_diary');
+    else if (actionType === 'CHECK_ANIMAL_HEALTH') onNavigateAction('livestock', 'health');
+    else if (actionType === 'LOG_MILK') onNavigateAction('livestock', 'milk');
+    else if (actionType === 'VIEW_LIVESTOCK') onNavigateAction('livestock', 'overview');
+    else if (actionType === 'VIEW_WEATHER') onNavigateAction('weather');
   };
 
   return (
@@ -222,6 +240,30 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Active Field Banner */}
+        {activeField && (
+          <div className="bg-blue-50/90 border-b border-blue-100 px-4 py-2 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <span className="text-sm">🌾</span>
+              <span className="font-bold text-blue-950 truncate">
+                {activeField.name}: <span className="text-blue-700 font-semibold">{activeField.crop}</span>
+                <span className="text-stone-500 text-[11px] font-normal ml-1">
+                  ({activeField.acreage} {activeField.acreageUnit || 'एकर'}, {activeField.cropStage})
+                </span>
+              </span>
+            </div>
+            {profile.fields.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setIsFieldSelectorOpen(true)}
+                className="shrink-0 ml-2 px-2.5 py-1 bg-white hover:bg-blue-100 text-blue-700 font-bold text-[11px] rounded-lg border border-blue-200 transition-colors shadow-xs cursor-pointer"
+              >
+                बदला
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Conversation Stream */}
         <div className="p-4 space-y-3.5 overflow-y-auto flex-1">
@@ -336,6 +378,20 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
           </button>
         </div>
       </div>
+
+      {isFieldSelectorOpen && (
+        <FieldSelectorModal
+          language={language}
+          fields={profile.fields}
+          activeFieldId={activeFieldId}
+          onSelectField={(id) => {
+            setActiveFieldId(id);
+            if (onSelectField) onSelectField(id);
+            setIsFieldSelectorOpen(false);
+          }}
+          onClose={() => setIsFieldSelectorOpen(false)}
+        />
+      )}
     </div>
   );
 };

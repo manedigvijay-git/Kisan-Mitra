@@ -87,6 +87,71 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "userId", "cropName", "issueNameLocal"]
+    },
+    "AnimalProfile": {
+      "title": "AnimalProfile",
+      "description": "Individual cow, buffalo, goat, sheep, or cattle animal record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "type": { "type": "string", "maxLength": 50 },
+        "breed": { "type": "string", "maxLength": 100 },
+        "sex": { "type": "string", "maxLength": 20 },
+        "ageYears": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "type"]
+    },
+    "FarmTask": {
+      "title": "FarmTask",
+      "description": "Unified reminder and farming task for crop or animal care",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 50 },
+        "dueDate": { "type": "string", "maxLength": 20 },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "title", "dueDate"]
+    },
+    "FarmFinance": {
+      "title": "FarmFinance",
+      "description": "Farm income or expense entry with categorization and quantity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 20 },
+        "category": { "type": "string", "maxLength": 100 },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "maxLength": 20 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "type", "category", "amount", "date"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "Farm stock item including fertilizers, seeds, pesticides, and animal feed",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "productName": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 50 },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 50 },
+        "purchaseDate": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "productName", "category", "quantity"]
     }
   },
   "firestore": {
@@ -109,6 +174,22 @@
     "/users/{userId}/diagnostics/{diagId}": {
       "schema": "CropDiagnosis",
       "description": "Subcollection of AI crop diagnoses saved by the farmer"
+    },
+    "/users/{userId}/animals/{animalId}": {
+      "schema": "AnimalProfile",
+      "description": "Subcollection of cattle and livestock animals belonging exclusively to the farmer"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "FarmTask",
+      "description": "Subcollection of scheduled farm reminders and tasks"
+    },
+    "/users/{userId}/finances/{financeId}": {
+      "schema": "FarmFinance",
+      "description": "Subcollection of farm income and expense transaction records"
+    },
+    "/users/{userId}/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Subcollection of farm stock and input supplies inventory"
     }
   }
 }

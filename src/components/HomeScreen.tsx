@@ -15,8 +15,17 @@ import {
   AlertTriangle,
   Sparkles,
   Edit3,
+  Layers,
+  Calendar,
+  Heart,
+  Package,
+  TrendingUp,
+  Stethoscope,
+  Milk,
+  ShieldCheck,
+  Plus
 } from 'lucide-react';
-import { Language, FarmerProfile, WeatherData } from '../types';
+import { Language, FarmerProfile, WeatherData, Animal } from '../types';
 import { translations } from '../locales/translations';
 import { SpeechService } from '../utils/speech';
 
@@ -29,6 +38,12 @@ interface HomeScreenProps {
   isAudioMuted: boolean;
   onOpenAuthTab?: (tab: 'google' | 'phone' | 'old_member') => void;
   onEditProfile?: () => void;
+  onOpenFieldSelector?: () => void;
+  animals?: Animal[];
+  activeAnimalId?: string;
+  onOpenAnimalSelector?: () => void;
+  taskCount?: number;
+  inventoryAlertCount?: number;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -40,9 +55,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   isAudioMuted,
   onOpenAuthTab,
   onEditProfile,
+  onOpenFieldSelector,
+  animals = [],
+  activeAnimalId,
+  onOpenAnimalSelector,
+  taskCount = 0,
+  inventoryAlertCount = 0,
 }) => {
   const t = translations[language];
   const activeField = profile.fields.find((f) => f.id === profile.activeFieldId) || profile.fields[0];
+  const activeAnimal = animals.find((a) => a.id === activeAnimalId) || animals[0];
+
+  const getCropEmoji = (cropName: string = '') => {
+    const lower = cropName.toLowerCase();
+    if (lower.includes('ऊस') || lower.includes('sugar')) return '🎋';
+    if (lower.includes('कांदा') || lower.includes('onion')) return '🧅';
+    if (lower.includes('सोयाबीन') || lower.includes('soy')) return '🌱';
+    if (lower.includes('गहू') || lower.includes('wheat')) return '🌾';
+    if (lower.includes('कापूस') || lower.includes('cotton')) return '☁️';
+    if (lower.includes('तूर') || lower.includes('pigeon')) return '🌿';
+    if (lower.includes('मका') || lower.includes('maize')) return '🌽';
+    if (lower.includes('टोमॅटो') || lower.includes('tomato')) return '🍅';
+    if (lower.includes('डाळिंब') || lower.includes('pom')) return '🍎';
+    return '🌱';
+  };
+
+  const getAnimalEmoji = (type: string = '') => {
+    switch (type.toLowerCase()) {
+      case 'cow':
+        return '🐄';
+      case 'buffalo':
+        return '🐃';
+      case 'bull':
+        return '🐂';
+      case 'calf':
+        return '🐮';
+      case 'goat':
+        return '🐐';
+      case 'sheep':
+        return '🐑';
+      case 'poultry':
+        return '🐔';
+      default:
+        return '🐾';
+    }
+  };
 
   // Get time-based greeting
   const currentHour = new Date().getHours();
@@ -59,34 +116,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     {
       id: 'scan_crop',
       title: t.btnScanCrop,
-      desc: t.btnScanCropDesc,
+      desc: activeField ? `${activeField.crop} वरील रोग किंवा किडीचा फोटो काढा` : t.btnScanCropDesc,
       icon: Camera,
-      badge: 'रोग व कीड',
+      badge: activeField?.crop || 'रोग व कीड',
       bgClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
       accentColor: 'border-emerald-500',
     },
     {
+      id: 'livestock',
+      title: t.btnLivestock,
+      desc: activeAnimal
+        ? `${activeAnimal.name} (${activeAnimal.breed}) आरोग्य, दूध व लसीकरण`
+        : t.btnLivestockDesc,
+      icon: Heart,
+      badge: `${animals.length} जनावरे`,
+      bgClass: 'bg-amber-800 hover:bg-amber-900 text-white',
+      accentColor: 'border-amber-700',
+    },
+    {
       id: 'check_fertilizer',
       title: t.btnCheckFertilizer,
-      desc: t.btnCheckFertilizerDesc,
+      desc: activeField ? `${activeField.crop} साठी खतांचे प्रमाण व सुसंगतता तपासा` : t.btnCheckFertilizerDesc,
       icon: FlaskConical,
       badge: 'खत सुसंगतता',
       bgClass: 'bg-amber-600 hover:bg-amber-700 text-white',
       accentColor: 'border-amber-500',
     },
     {
-      id: 'check_soil',
-      title: t.btnCheckSoil,
-      desc: t.btnCheckSoilDesc,
-      icon: TestTube2,
-      badge: 'माती आरोग्य',
-      bgClass: 'bg-teal-700 hover:bg-teal-800 text-white',
-      accentColor: 'border-teal-600',
+      id: 'calendar',
+      title: t.btnCalendar,
+      desc: taskCount > 0 ? `${taskCount} नियोजित कामे व आठवणी बाकी` : t.btnCalendarDesc,
+      icon: Calendar,
+      badge: taskCount > 0 ? `${taskCount} कामे` : 'वेळापत्रक',
+      bgClass: 'bg-teal-800 hover:bg-teal-900 text-white',
+      accentColor: 'border-teal-700',
     },
     {
       id: 'ask_voice',
       title: t.btnAskVoice,
-      desc: t.btnAskVoiceDesc,
+      desc: activeField ? `${activeField.name} (${activeField.crop}) बद्दल आवाजाने विचारा` : t.btnAskVoiceDesc,
       icon: Mic,
       badge: 'कृषी मित्र',
       bgClass: 'bg-blue-600 hover:bg-blue-700 text-white',
@@ -94,18 +162,45 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       pulse: true,
     },
     {
+      id: 'finance',
+      title: t.btnFinance,
+      desc: t.btnFinanceDesc,
+      icon: TrendingUp,
+      badge: 'नफा-तोटा',
+      bgClass: 'bg-stone-800 hover:bg-stone-900 text-white',
+      accentColor: 'border-stone-700',
+    },
+    {
       id: 'my_farm',
       title: t.btnMyFarm,
-      desc: t.btnMyFarmDesc,
+      desc: `एकूण ${profile.fields.length} शेते • पीक, खते व माती व्यवस्थापन`,
       icon: Sprout,
-      badge: 'नोंदी व क्षेत्र',
+      badge: `${profile.fields.length} शेते`,
       bgClass: 'bg-lime-700 hover:bg-lime-800 text-white',
       accentColor: 'border-lime-600',
     },
     {
+      id: 'inventory',
+      title: t.btnInventory,
+      desc: inventoryAlertCount > 0 ? `⚠️ ${inventoryAlertCount} वस्तूंचा साठा कमी आहे!` : t.btnInventoryDesc,
+      icon: Package,
+      badge: inventoryAlertCount > 0 ? 'कमी साठा' : 'गोदाम साठा',
+      bgClass: 'bg-stone-700 hover:bg-stone-800 text-white',
+      accentColor: 'border-stone-600',
+    },
+    {
+      id: 'check_soil',
+      title: t.btnCheckSoil,
+      desc: activeField ? `${activeField.name} चा माती आरोग्य अहवाल व उपाय` : t.btnCheckSoilDesc,
+      icon: TestTube2,
+      badge: 'माती आरोग्य',
+      bgClass: 'bg-teal-700 hover:bg-teal-800 text-white',
+      accentColor: 'border-teal-600',
+    },
+    {
       id: 'crop_problems',
       title: t.btnCropProblems,
-      desc: t.btnCropProblemsDesc,
+      desc: activeField ? `${activeField.crop} मधील चालू समस्या व मार्गदर्शक` : t.btnCropProblemsDesc,
       icon: Bug,
       badge: 'माहिती कोश',
       bgClass: 'bg-orange-700 hover:bg-orange-800 text-white',
@@ -151,26 +246,365 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </div>
 
-        {/* Quick field summary badge */}
+        {/* Quick total farms/fields badge */}
         <div
           onClick={() => onOpenAction('my_farm')}
           className="bg-white/10 hover:bg-white/20 transition-all rounded-xl p-2.5 flex items-center justify-between gap-3 border border-white/15 cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <span className="p-1.5 bg-emerald-500/20 text-emerald-300 rounded-lg text-lg">🌱</span>
+            <span className="p-1.5 bg-emerald-500/20 text-emerald-300 rounded-lg text-lg">🌾</span>
             <div>
-              <div className="text-[11px] text-emerald-200 font-medium">{t.activeField}:</div>
+              <div className="text-[11px] text-emerald-200 font-medium">एकूण शेते (Total Fields):</div>
               <div className="text-xs font-bold text-white">
-                {activeField ? activeField.name : 'शेत'}{' '}
-                <span className="text-amber-300">
-                  ({activeField ? `${activeField.crop} • ${activeField.acreage} एकर` : ''})
-                </span>
+                {profile.fields.length} शेते ({profile.fields.reduce((acc, f) => acc + (f.acreage || 0), 0)} एकर)
               </div>
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-stone-400" />
         </div>
       </div>
+
+      {/* PROMINENT CURRENT ACTIVE FIELD SECTION */}
+      <div className="bg-white rounded-2xl p-4 border-2 border-emerald-600 shadow-sm space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black uppercase text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-full">
+              सध्या निवडलेले शेत (Current Field)
+            </span>
+            <span className="text-[11px] text-stone-500 font-semibold hidden sm:inline">
+              ({profile.fields.length} पैकी १)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onOpenFieldSelector && (
+              <button
+                type="button"
+                onClick={onOpenFieldSelector}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+              >
+                <Layers className="w-3.5 h-3.5 text-emerald-200" />
+                <span>शेत बदला (Change Field)</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onOpenAction('my_farm')}
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-xl cursor-pointer transition-colors"
+            >
+              माझी शेते ➔
+            </button>
+          </div>
+        </div>
+
+        {/* Current Field Highlight Card */}
+        <div
+          onClick={onOpenFieldSelector || (() => onOpenAction('my_farm'))}
+          className="flex items-center justify-between gap-3 bg-stone-50 hover:bg-emerald-50/50 p-3.5 rounded-2xl border border-stone-200 hover:border-emerald-300 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <span className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-2xl shrink-0 border border-stone-200 shadow-2xs">
+              {getCropEmoji(activeField?.crop)}
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-stone-900 truncate">
+                  {activeField ? `${activeField.name} — ${activeField.crop} — ${activeField.acreage} ${activeField.acreageUnit || 'एकर'}` : 'Field 1 — Sugarcane — 2 acres'}
+                </h3>
+              </div>
+              <p className="text-xs text-stone-600 font-medium truncate mt-0.5">
+                वाढीची अवस्था: <span className="font-bold text-stone-800">{activeField?.cropStage?.split('/')[0] || 'शाकीय वाढ'}</span> • माती: {activeField?.soilType?.split('(')[0] || 'काळी कसदार'}
+                {activeField?.variety ? ` • वाण: ${activeField.variety}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-1 text-emerald-700 font-bold text-xs bg-white px-2.5 py-1.5 rounded-xl border border-stone-200 shadow-2xs">
+            <span>बदला</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+
+        <p className="text-[11px] text-stone-500 flex items-center gap-1.5 pt-0.5">
+          <span>💡</span>
+          <span>खालील सर्व स्कॅनर, खत तपासणी, रोग उपाय व आवाज सहाय्यक <strong>{activeField?.name || 'सध्या निवडलेल्या शेता'}</strong>साठी काम करतील.</span>
+        </p>
+      </div>
+
+      {/* ============================================================ */}
+      {/* 🐄 CATTLE & LIVESTOCK REARING (स्वतंत्र गोपालन व पशुधन विभाग) */}
+      {/* ============================================================ */}
+      <section className="bg-amber-50/50 rounded-3xl p-4 sm:p-5 border-2 border-amber-600 shadow-sm space-y-3.5">
+        {/* Major Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🐄</span>
+              <h2 className="text-base sm:text-lg font-black text-amber-950 tracking-tight">
+                CATTLE & LIVESTOCK REARING
+              </h2>
+            </div>
+            <p className="text-[11px] sm:text-xs text-amber-800 font-bold mt-0.5">
+              स्वतंत्र गोपालन व पशुधन विभाग • Do not mix with crop/field data
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {animals.length > 0 && onOpenAnimalSelector && (
+              <button
+                type="button"
+                onClick={onOpenAnimalSelector}
+                className="bg-amber-900 hover:bg-amber-950 text-white text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs"
+              >
+                <span>🔄 जनावर बदला</span>
+                <span className="bg-amber-800 text-amber-200 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                  {animals.length}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'add_animal')}
+              className="bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+            >
+              <span>+ नवीन जनावर</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Active Animal Banner */}
+        {activeAnimal ? (
+          <div
+            onClick={onOpenAnimalSelector || (() => onOpenAction('livestock', 'overview'))}
+            className="flex items-center justify-between gap-3 bg-white hover:bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 transition-all cursor-pointer shadow-2xs"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span className="w-12 h-12 rounded-2xl bg-amber-100/70 flex items-center justify-center text-2xl shrink-0 border border-amber-200 shadow-2xs">
+                {getAnimalEmoji(activeAnimal.type)}
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-stone-900 truncate">
+                    {activeAnimal.name} ({activeAnimal.breed || 'स्थानिक जात'})
+                  </h3>
+                  {activeAnimal.pregnancyStatus === 'pregnant' && (
+                    <span className="bg-purple-100 text-purple-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                      🤰 गाभण
+                    </span>
+                  )}
+                  {activeAnimal.pregnancyStatus === 'in_heat' && (
+                    <span className="bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0">
+                      🔥 माजावर
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-600 font-medium truncate mt-0.5">
+                  वय: <span className="font-bold text-stone-800">{activeAnimal.ageYears} वर्षे</span>
+                  {activeAnimal.tagNumber ? ` • टॅग: ${activeAnimal.tagNumber}` : ''}
+                  {activeAnimal.dailyMilkLiters !== undefined && activeAnimal.dailyMilkLiters > 0
+                    ? ` • दूध: ${activeAnimal.dailyMilkLiters}L/दिवस`
+                    : ''}
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-1 text-amber-800 font-bold text-xs bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-200">
+              <span>माहिती पहा</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => onOpenAction('livestock', 'add_animal')}
+            className="p-3.5 bg-white hover:bg-amber-50 rounded-2xl border border-dashed border-amber-300 flex items-center justify-between gap-3 cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🐮</span>
+              <div>
+                <h4 className="text-xs font-bold text-stone-800">
+                  तुमच्याकडे गाई, म्हशी, शेळ्या किंवा बैल आहेत का?
+                </h4>
+                <p className="text-[11px] text-stone-500">
+                  आरोग्य तपासणी, लसीकरण आणि दुग्ध नोंदीसाठी पहिले जनावर नोंदवा.
+                </p>
+              </div>
+            </div>
+            <span className="bg-amber-800 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs shrink-0">
+              + जोडा
+            </span>
+          </div>
+        )}
+
+        {/* 8 Core Large Buttons for Simple Livestock Management */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 uppercase tracking-wide">
+            <span>पशुधन व्यवस्थापन सुविधा (8 Modules):</span>
+            <span className="text-[10px] text-amber-700 font-medium lowercase">किमान टायपिंग • १-क्लिक</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 1. My Animals */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'overview')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">🐄</span>
+                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-full">
+                  {animals.length}
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  माझी जनावरे
+                </div>
+                <div className="text-[10px] text-stone-500">My Animals</div>
+              </div>
+            </button>
+
+            {/* 2. Animal Health */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'health')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">🩺</span>
+                <span className="text-[10px] font-extrabold bg-rose-100 text-rose-800 px-1.5 py-0.5 rounded-full">
+                  AI मदत
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  पशु आरोग्य
+                </div>
+                <div className="text-[10px] text-stone-500">Animal Health</div>
+              </div>
+            </button>
+
+            {/* 3. Vaccinations */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'vaccines')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">💉</span>
+                <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full">
+                  लस वेळापत्रक
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  लसीकरण
+                </div>
+                <div className="text-[10px] text-stone-500">Vaccinations</div>
+              </div>
+            </button>
+
+            {/* 4. Milk */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'milk')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">🥛</span>
+                <span className="text-[10px] font-extrabold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
+                  दैनिक
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  दूध नोंद
+                </div>
+                <div className="text-[10px] text-stone-500">Milk Record</div>
+              </div>
+            </button>
+
+            {/* 5. Feed */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'feed')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">🌾</span>
+                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-full">
+                  पोषण
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  पशुखाद्य व चारा
+                </div>
+                <div className="text-[10px] text-stone-500">Feed & Fodder</div>
+              </div>
+            </button>
+
+            {/* 6. Breeding */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'breeding')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">🤰</span>
+                <span className="text-[10px] font-extrabold bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded-full">
+                  गाभण नोंद
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  प्रजोत्पादन
+                </div>
+                <div className="text-[10px] text-stone-500">Breeding</div>
+              </div>
+            </button>
+
+            {/* 7. Reminders */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'reminders')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">📅</span>
+                <span className="text-[10px] font-extrabold bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded-full">
+                  कॅलेंडर
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  आठवण व दिनदर्शिका
+                </div>
+                <div className="text-[10px] text-stone-500">Reminders</div>
+              </div>
+            </button>
+
+            {/* 8. Records */}
+            <button
+              type="button"
+              onClick={() => onOpenAction('livestock', 'records')}
+              className="p-3 bg-white hover:bg-amber-50 border border-amber-200 rounded-2xl text-left flex flex-col justify-between gap-2 cursor-pointer transition-all active:scale-95 shadow-2xs group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-2xl">📋</span>
+                <span className="text-[10px] font-extrabold bg-stone-100 text-stone-800 px-1.5 py-0.5 rounded-full">
+                  इतिहास
+                </span>
+              </div>
+              <div>
+                <div className="text-xs font-extrabold text-stone-900 group-hover:text-amber-950">
+                  उपचार व नोंदी
+                </div>
+                <div className="text-[10px] text-stone-500">Treatment & Logs</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </section>
 
       {/* Quick Login / Sign In Options Bar for First-time & Returning Farmers */}
       {!profile.isFirebaseUser && (
@@ -280,21 +714,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         })}
       </div>
 
-      {/* Secondary Fast Utilities: Farm Diary & Cost Calculator */}
-      <div className="pt-2 grid grid-cols-2 gap-3">
+      {/* Secondary Fast Utilities: Farm Diary, Cost Calculator, Calendar, Finance, Stock */}
+      <div className="pt-2 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <button
           onClick={() => {
             playSoundForButton(t.btnFarmDiary);
             onOpenAction('farm_diary');
           }}
-          className="p-3.5 bg-stone-200 hover:bg-stone-300 border border-stone-300 rounded-2xl flex items-center gap-2.5 text-stone-900 font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer"
+          className="p-3 bg-stone-200 hover:bg-stone-300 border border-stone-300 rounded-2xl flex items-center gap-2 text-stone-900 font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
         >
-          <div className="p-2 bg-emerald-600 text-white rounded-xl">
-            <BookOpen className="w-4 h-4" />
+          <div className="p-2 bg-emerald-600 text-white rounded-xl shrink-0">
+            <BookOpen className="w-3.5 h-3.5" />
           </div>
-          <div className="text-left">
-            <div>{t.btnFarmDiary}</div>
-            <div className="text-[10px] text-stone-600 font-normal">खते व फवारणी नोंद</div>
+          <div className="text-left min-w-0">
+            <div className="truncate">{t.btnFarmDiary}</div>
+            <div className="text-[10px] text-stone-600 font-normal truncate">खते व फवारणी</div>
           </div>
         </button>
 
@@ -303,14 +737,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             playSoundForButton(t.btnCostCalculator);
             onOpenAction('cost_calculator');
           }}
-          className="p-3.5 bg-stone-200 hover:bg-stone-300 border border-stone-300 rounded-2xl flex items-center gap-2.5 text-stone-900 font-bold text-xs shadow-sm transition-all active:scale-95 cursor-pointer"
+          className="p-3 bg-stone-200 hover:bg-stone-300 border border-stone-300 rounded-2xl flex items-center gap-2 text-stone-900 font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
         >
-          <div className="p-2 bg-amber-600 text-white rounded-xl">
-            <Calculator className="w-4 h-4" />
+          <div className="p-2 bg-amber-600 text-white rounded-xl shrink-0">
+            <Calculator className="w-3.5 h-3.5" />
           </div>
-          <div className="text-left">
-            <div>{t.btnCostCalculator}</div>
-            <div className="text-[10px] text-stone-600 font-normal">एकरी खर्चाचा हिशोब</div>
+          <div className="text-left min-w-0">
+            <div className="truncate">{t.btnCostCalculator}</div>
+            <div className="text-[10px] text-stone-600 font-normal truncate">एकरी खत हिशोब</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => {
+            playSoundForButton(t.btnCalendar);
+            onOpenAction('calendar');
+          }}
+          className="p-3 bg-stone-200 hover:bg-stone-300 border border-stone-300 rounded-2xl flex items-center gap-2 text-stone-900 font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+        >
+          <div className="p-2 bg-teal-700 text-white rounded-xl shrink-0">
+            <Calendar className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-left min-w-0">
+            <div className="truncate">शेती कॅलेंडर</div>
+            <div className="text-[10px] text-stone-600 font-normal truncate">आठवणी व कामे</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => {
+            playSoundForButton(t.btnInventory);
+            onOpenAction('inventory');
+          }}
+          className="p-3 bg-stone-200 hover:bg-stone-300 border border-stone-300 rounded-2xl flex items-center gap-2 text-stone-900 font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+        >
+          <div className="p-2 bg-stone-800 text-white rounded-xl shrink-0">
+            <Package className="w-3.5 h-3.5" />
+          </div>
+          <div className="text-left min-w-0">
+            <div className="truncate">गोदाम साठा</div>
+            <div className="text-[10px] text-stone-600 font-normal truncate">शिल्लक खते/खाद्य</div>
           </div>
         </button>
       </div>

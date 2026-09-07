@@ -180,6 +180,61 @@ export const CROPS_DATABASE: CropGuide[] = [
       },
     ],
   },
+  {
+    id: 'sugarcane',
+    name: { mr: 'ऊस (Sugarcane)', hi: 'गन्ना (Sugarcane)', en: 'Sugarcane' },
+    season: 'Annual',
+    durationDays: 365,
+    recommendedNPK_KgPerAcre: { n: 100, p: 40, k: 50 }, // Standard 250:115:115 kg/ha
+    stages: [
+      { id: 'germination', name: { mr: 'उगवण अवस्था', hi: 'अंकुरण अवस्था', en: 'Germination' }, daysAfterSowing: '0-45' },
+      { id: 'tillering', name: { mr: 'फुटवे येण्याची अवस्था', hi: 'कल्ले फूटना', en: 'Tillering Phase' }, daysAfterSowing: '45-120' },
+      { id: 'grand_growth', name: { mr: 'मोठी बांधणी व वाढ', hi: 'तीव्र वानस्पतिक वृद्धि', en: 'Grand Growth / Cane Formation' }, daysAfterSowing: '120-270' },
+      { id: 'maturity', name: { mr: 'पक्वता व साखर भरणी', hi: 'परिपक्वता व कटाई', en: 'Ripening & Harvesting' }, daysAfterSowing: '270-360' },
+    ],
+    commonProblems: [
+      {
+        id: 'sugarcane_early_shoot_borer',
+        title: { mr: 'खोड कीड (अर्ली शूट बोरर)', hi: 'कंसुआ / प्ररोह बेधक (Shoot Borer)', en: 'Early Shoot Borer' },
+        type: 'pest',
+        symptoms: {
+          mr: 'उसाचा मधला पोंगा वाळतो (डेड हार्ट / Dead Heart) व ओढल्यास सहज निघून येतो, त्याला घाण वास येतो.',
+          hi: 'केंद्रीय प्ररोह सूख जाता है (डेड हार्ट) और खींचने पर आसानी से दुर्गंध के साथ निकल आता है।',
+          en: 'Central drying shoot (Dead Heart) which can be pulled out easily with foul odor.',
+        },
+        organicRemedy: {
+          mr: 'ट्रायकोग्रामा चिलोनिस परोपजीवी मित्रकीटक कार्ड एकरी २ ते ३ लावा. पिकात पाणी साचू देऊ नका.',
+          hi: 'ट्राइकोग्रामा कार्ड 2-3 प्रति एकड़ लगाएं। खेत में जलभराव न होने दें।',
+          en: 'Release Trichogramma chilonis egg parasitoids @ 2 cards/acre; avoid moisture stress.',
+        },
+        chemicalRemedy: {
+          mr: 'क्लोरँट्रानिलीप्रोल (कोराजन १८.५% एससी) @ ०.४ मिली प्रति लिटर पाण्यात मिसळून आळवणी (Drenching) करा किंवा फर्टेरा (०.४% जीआर) ७.५ किलो एकरी टाका.',
+          hi: 'क्लोरेंट्रानिलिप्रोल 18.5% SC @ 0.4 मिली/लीटर पानी से ड्रेन्चिंग या 7.5 किग्रा प्रति एकड़ फर्टेरा।',
+          en: 'Chlorantraniliprole 18.5% SC @ 0.4 ml/L drenching around root zone at 30-45 days.',
+        },
+      },
+      {
+        id: 'sugarcane_pokkah_boeng',
+        title: { mr: 'पोक्का बोईंग (माथा कुजणे)', hi: 'पोक्का बोइंग रोग', en: 'Pokkah Boeng' },
+        type: 'disease',
+        symptoms: {
+          mr: 'शेंड्याची पाने पिवळी पडून सुरकुततात, पानाच्या तळाशी लाल-तपकिरी रेषा उमटतात व शेंडा वाकडा होतो.',
+          hi: 'शीर्ष की पत्तियां पीली पड़कर मुड़ जाती हैं, आधार पर लाल धारियां और शीर्ष विकृत होता है।',
+          en: 'Top leaves crumple and show chlorotic base with reddish lesions; top malformation.',
+        },
+        organicRemedy: {
+          mr: 'ट्रायकोडर्मा व्हिरीडी २ किलो प्रति एकर शेणखतात मिसळून जमिनीत द्या.',
+          hi: 'ट्राइकोडर्मा 2 किग्रा प्रति एकड़ सड़ी गोबर खाद में मिलाकर दें।',
+          en: 'Soil application of Trichoderma viride enriched with FYM.',
+        },
+        chemicalRemedy: {
+          mr: 'कॉपर ऑक्सिक्लोराईड ५०% डब्ल्यूपी @ २.५ ग्रॅम किंवा कार्बेन्डाझिम १२% + मँकोझेब ६३% @ २ ग्रॅम प्रति लिटर पाणी फवारा.',
+          hi: 'कॉपर ऑक्सीक्लोराइड 50% WP @ 2.5 ग्राम या कार्बेन्डाजिम + मैंकोजेब @ 2 ग्राम प्रति लीटर।',
+          en: 'Foliar spray with Copper Oxychloride 50% WP @ 2.5 g/L or Carbendazim+Mancozeb @ 2 g/L.',
+        },
+      },
+    ],
+  },
 ];
 
 // INCOMPATIBLE FERTILIZER COMBINATIONS (AGRONOMIC SAFETY ENGINE)
