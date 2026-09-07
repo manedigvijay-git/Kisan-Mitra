@@ -47,87 +47,6 @@ import { FarmingCalendarModal } from './components/FarmingCalendarModal';
 import { FarmFinanceModal } from './components/FarmFinanceModal';
 import { FarmInventoryModal } from './components/FarmInventoryModal';
 
-const DEFAULT_ANIMALS: Animal[] = [
-  {
-    id: 'animal_1',
-    name: 'गौरी (Gauri)',
-    type: 'cow',
-    breed: 'गीर (Gir)',
-    ageYears: 4,
-    tagNumber: 'MH-12-8821',
-    pregnancyStatus: 'none',
-    lactationStage: 'lactating',
-    dailyMilkLiters: 12,
-    healthRecords: [
-      {
-        id: 'health_1',
-        animalId: 'animal_1',
-        date: '2025-02-15',
-        symptoms: ['डोळे व नाकातून सौम्य पाणी'],
-        notes: 'तापमान सामान्य, चारा व्यवस्थित खात आहे.',
-        severity: 'mild',
-        recommendedNextStep: 'स्वच्छ कोमट पाणी द्या, गोठा कोरडा ठेवा.',
-      },
-    ],
-    vaccinations: [
-      {
-        id: 'vac_1',
-        animalId: 'animal_1',
-        vaccineName: 'FMD (लाळ्या खुरकूत)',
-        administeredDate: '2024-11-10',
-        nextDueDate: '2025-05-10',
-        notes: 'शासकीय शिबिरात लस टोचली',
-      },
-      {
-        id: 'vac_2',
-        animalId: 'animal_1',
-        vaccineName: 'HS (घटसर्प)',
-        administeredDate: '2024-06-15',
-        nextDueDate: '2025-06-15',
-      },
-    ],
-    milkRecords: [
-      {
-        id: 'milk_1',
-        animalId: 'animal_1',
-        date: new Date().toISOString().split('T')[0],
-        morningLiters: 6.5,
-        eveningLiters: 5.5,
-        fatPercentage: 4.2,
-        snfPercentage: 8.6,
-      },
-    ],
-    notes: 'शांत स्वभावाची, दर्जेदार दूध उत्पादन.',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'animal_2',
-    name: 'लक्ष्मी (Lakshmi)',
-    type: 'buffalo',
-    breed: 'मुऱ्हा (Murrah)',
-    ageYears: 5,
-    tagNumber: 'MH-12-9042',
-    pregnancyStatus: 'pregnant',
-    inseminationDate: '2024-09-15',
-    expectedDeliveryDate: '2025-07-25',
-    lactationStage: 'dry',
-    dailyMilkLiters: 0,
-    healthRecords: [],
-    vaccinations: [
-      {
-        id: 'vac_3',
-        animalId: 'animal_2',
-        vaccineName: 'FMD (लाळ्या खुरकूत)',
-        administeredDate: '2024-11-10',
-        nextDueDate: '2025-05-10',
-      },
-    ],
-    milkRecords: [],
-    notes: 'गाभण आहे, विशेष खुराक व चारा सुरू आहे.',
-    createdAt: new Date().toISOString(),
-  },
-];
-
 const DEFAULT_TASKS: FarmTask[] = [
   {
     id: 'task_1',
@@ -137,16 +56,6 @@ const DEFAULT_TASKS: FarmTask[] = [
     isCompleted: false,
     priority: 'high',
     notes: 'ड्रीप द्वारे ४ किलो प्रति एकर',
-  },
-  {
-    id: 'task_2',
-    title: 'गौरी गाय लाळ्या खुरकूत लस बूस्टर',
-    category: 'vaccination',
-    dueDate: '2025-05-10',
-    isCompleted: false,
-    priority: 'medium',
-    animalId: 'animal_1',
-    notes: 'पशुवैद्यकीय दवाखान्यात संपर्क करणे',
   },
 ];
 
@@ -226,12 +135,42 @@ export default function App() {
   const [animals, setAnimals] = useState<Animal[]>(() => {
     try {
       const saved = localStorage.getItem('kisan_animals');
-      return saved ? JSON.parse(saved) : DEFAULT_ANIMALS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Filter out old legacy dummy animals if present
+          return parsed.filter((a: Animal) => a.id !== 'animal_1' && a.id !== 'animal_2');
+        }
+      }
+      return [];
     } catch {
-      return DEFAULT_ANIMALS;
+      return [];
     }
   });
-  const [activeAnimalId, setActiveAnimalId] = useState<string>('animal_1');
+  const [activeAnimalId, setActiveAnimalId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('kisan_active_animal_id') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [hasAnimalsChoice, setHasAnimalsChoiceState] = useState<'yes' | 'no' | 'skip' | undefined>(() => {
+    try {
+      const saved = localStorage.getItem('kisan_has_animals_choice');
+      return (saved as any) || undefined;
+    } catch {
+      return undefined;
+    }
+  });
+
+  const setHasAnimalsChoice = (choice: 'yes' | 'no' | 'skip') => {
+    setHasAnimalsChoiceState(choice);
+    try {
+      localStorage.setItem('kisan_has_animals_choice', choice);
+    } catch (e) {
+      console.warn('LocalStorage notice:', e);
+    }
+  };
 
   const [tasks, setTasks] = useState<FarmTask[]>(() => {
     try {
@@ -393,11 +332,16 @@ export default function App() {
           });
 
           unsubAnimals = FarmDataSyncService.subscribeAnimals(uid, (remoteAnimals) => {
-            if (remoteAnimals && remoteAnimals.length > 0) {
-              setAnimals(remoteAnimals);
-              setActiveAnimalId((prev) =>
-                remoteAnimals.some((a) => a.id === prev) ? prev : remoteAnimals[0].id
-              );
+            if (remoteAnimals) {
+              const cleaned = remoteAnimals.filter((a) => a.id !== 'animal_1' && a.id !== 'animal_2');
+              setAnimals(cleaned);
+              if (cleaned.length === 0) {
+                setActiveAnimalId('');
+              } else {
+                setActiveAnimalId((prev) =>
+                  cleaned.some((a) => a.id === prev) ? prev : ''
+                );
+              }
             }
           });
 
@@ -498,8 +442,8 @@ export default function App() {
           `/api/weather?lat=${profile.location.latitude || 20.03}&lon=${profile.location.longitude || 78.53}&language=${language}`
         );
         const data = await res.json();
-        if (data.weather) {
-          setWeather(data.weather);
+        if (data && (data.weather || data.current)) {
+          setWeather(data.weather || data);
         }
       } catch (err) {
         console.warn('Weather fetch error:', err);
@@ -787,6 +731,8 @@ export default function App() {
           onOpenFieldSelector={() => setActiveModal('select_field')}
           animals={animals}
           activeAnimalId={activeAnimalId}
+          hasAnimalsChoice={hasAnimalsChoice}
+          onSetHasAnimalsChoice={setHasAnimalsChoice}
           onOpenAnimalSelector={() => setActiveModal('select_animal')}
           taskCount={tasks.filter((t) => !t.isCompleted).length}
           inventoryAlertCount={
@@ -1125,6 +1071,8 @@ export default function App() {
           initialTab={livestockInitialTab as any}
           animals={animals}
           activeAnimalId={activeAnimalId}
+          hasAnimalsChoice={hasAnimalsChoice}
+          onSetHasAnimalsChoice={setHasAnimalsChoice}
           onSelectActiveAnimal={(id) => setActiveAnimalId(id)}
           onSaveAnimal={handleSaveAnimal}
           onDeleteAnimal={handleDeleteAnimal}

@@ -55,6 +55,8 @@ interface LivestockModalProps {
   onClose: () => void;
   animals: Animal[];
   activeAnimalId?: string;
+  hasAnimalsChoice?: 'yes' | 'no' | 'skip';
+  onSetHasAnimalsChoice?: (choice: 'yes' | 'no' | 'skip') => void;
   initialTab?: LivestockTabKey;
   onSelectActiveAnimal: (animalId: string) => void;
   onSaveAnimal: (animal: Animal) => void;
@@ -75,6 +77,8 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
   onClose,
   animals,
   activeAnimalId,
+  hasAnimalsChoice,
+  onSetHasAnimalsChoice,
   initialTab = 'overview',
   onSelectActiveAnimal,
   onSaveAnimal,
@@ -100,13 +104,14 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
   }, [initialTab]);
 
   // Active Animal
-  const currentAnimal = animals.find((a) => a.id === activeAnimalId) || animals[0];
+  const currentAnimal = animals.find((a) => a.id === activeAnimalId) || (animals.length > 0 ? animals[0] : undefined);
 
   // Forms state
   // New Animal Form
   const [newAnimalName, setNewAnimalName] = useState('');
   const [newAnimalTag, setNewAnimalTag] = useState('');
   const [newAnimalType, setNewAnimalType] = useState<AnimalType>('cow');
+  const [customAnimalType, setCustomAnimalType] = useState('');
   const [newAnimalBreed, setNewAnimalBreed] = useState('Gir / गीर');
   const [newAnimalSex, setNewAnimalSex] = useState<AnimalSex>('female');
   const [newAnimalAge, setNewAnimalAge] = useState<number>(3);
@@ -190,12 +195,20 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
     e.preventDefault();
     if (!newAnimalName.trim()) return;
 
+    if (onSetHasAnimalsChoice) {
+      onSetHasAnimalsChoice('yes');
+    }
+
+    const effectiveBreed = newAnimalType === 'other' && customAnimalType.trim() 
+      ? `${customAnimalType.trim()} (${newAnimalBreed.trim() || 'स्थानिक'})`
+      : newAnimalBreed.trim() || 'स्थानिक जात';
+
     const newAnimal: Animal = {
       id: `animal_${Date.now()}`,
       name: newAnimalName.trim(),
       tagNumber: newAnimalTag.trim() || undefined,
       type: newAnimalType,
-      breed: newAnimalBreed.trim() || 'स्थानिक जात',
+      breed: effectiveBreed,
       sex: newAnimalSex,
       ageYears: Number(newAnimalAge) || 2,
       dateOfBirth: newAnimalDob || undefined,
@@ -212,6 +225,7 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
     // Reset
     setNewAnimalName('');
     setNewAnimalTag('');
+    setCustomAnimalType('');
     setNewAnimalDob('');
     setNewAnimalWeight('');
     setNewAnimalPhoto(null);
@@ -1762,8 +1776,8 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
               </h4>
 
               <div>
-                <label className="text-xs font-bold text-stone-700">जनावराचा प्रकार (Animal Type):</label>
-                <div className="grid grid-cols-4 gap-2 mt-1">
+                <label className="text-xs font-bold text-stone-700">जनावराचा किंवा प्राण्याचा प्रकार (Animal Type):</label>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 mt-1">
                   {[
                     { id: 'cow', label: 'गाय (Cow)', icon: '🐄' },
                     { id: 'buffalo', label: 'म्हैस (Buffalo)', icon: '🐃' },
@@ -1772,6 +1786,14 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                     { id: 'goat', label: 'शेळी (Goat)', icon: '🐐' },
                     { id: 'sheep', label: 'मेंढी (Sheep)', icon: '🐑' },
                     { id: 'poultry', label: 'कोंबडी (Poultry)', icon: '🐔' },
+                    { id: 'dog', label: 'कुत्रा (Dog)', icon: '🐕' },
+                    { id: 'cat', label: 'मांजर (Cat)', icon: '🐈' },
+                    { id: 'duck', label: 'बदक (Duck)', icon: '🦆' },
+                    { id: 'horse', label: 'घोडा (Horse)', icon: '🐎' },
+                    { id: 'donkey', label: 'गाढव (Donkey)', icon: '🫏' },
+                    { id: 'pig', label: 'डुक्कर (Pig)', icon: '🐖' },
+                    { id: 'rabbit', label: 'ससा (Rabbit)', icon: '🐇' },
+                    { id: 'camel', label: 'उंट (Camel)', icon: '🐪' },
                     { id: 'other', label: 'इतर (Other)', icon: '🐾' },
                   ].map((item) => (
                     <button
@@ -1785,10 +1807,23 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                       }`}
                     >
                       <div className="text-xl">{item.icon}</div>
-                      <div className="text-[10px] mt-0.5">{item.label}</div>
+                      <div className="text-[9px] leading-tight mt-0.5">{item.label}</div>
                     </button>
                   ))}
                 </div>
+
+                {newAnimalType === 'other' && (
+                  <div className="mt-2.5 bg-amber-50 p-2.5 rounded-xl border border-amber-300">
+                    <label className="text-xs font-bold text-amber-900">इतर पशू किंवा प्राण्याचे नाव सांगा / टाईप करा:</label>
+                    <input
+                      type="text"
+                      placeholder="उदा. टर्की, बदक, मासे, इत्यादी..."
+                      value={customAnimalType}
+                      onChange={(e) => setCustomAnimalType(e.target.value)}
+                      className="w-full p-2 bg-white border border-stone-300 rounded-xl text-xs mt-1 font-bold"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

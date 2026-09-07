@@ -33,7 +33,7 @@ interface HomeScreenProps {
   language: Language;
   profile: FarmerProfile;
   weather: WeatherData | null;
-  onOpenAction: (actionId: string) => void;
+  onOpenAction: (actionId: string, subTab?: string) => void;
   onStartDemoTour: () => void;
   isAudioMuted: boolean;
   onOpenAuthTab?: (tab: 'google' | 'phone' | 'old_member') => void;
@@ -41,6 +41,8 @@ interface HomeScreenProps {
   onOpenFieldSelector?: () => void;
   animals?: Animal[];
   activeAnimalId?: string;
+  hasAnimalsChoice?: 'yes' | 'no' | 'skip';
+  onSetHasAnimalsChoice?: (choice: 'yes' | 'no' | 'skip') => void;
   onOpenAnimalSelector?: () => void;
   taskCount?: number;
   inventoryAlertCount?: number;
@@ -58,13 +60,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenFieldSelector,
   animals = [],
   activeAnimalId,
+  hasAnimalsChoice,
+  onSetHasAnimalsChoice,
   onOpenAnimalSelector,
   taskCount = 0,
   inventoryAlertCount = 0,
 }) => {
   const t = translations[language];
   const activeField = profile.fields.find((f) => f.id === profile.activeFieldId) || profile.fields[0];
-  const activeAnimal = animals.find((a) => a.id === activeAnimalId) || animals[0];
+  const activeAnimal = animals.find((a) => a.id === activeAnimalId) || (animals.length > 0 ? animals[0] : undefined);
 
   const getCropEmoji = (cropName: string = '') => {
     const lower = cropName.toLowerCase();
@@ -343,9 +347,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <h2 className="text-base sm:text-lg font-black text-amber-950 tracking-tight">
                 CATTLE & LIVESTOCK REARING
               </h2>
+              <span className="text-[10px] bg-amber-200 text-amber-950 font-extrabold px-2 py-0.5 rounded-full border border-amber-300">
+                ऐच्छिक (Optional)
+              </span>
             </div>
             <p className="text-[11px] sm:text-xs text-amber-800 font-bold mt-0.5">
-              स्वतंत्र गोपालन व पशुधन विभाग • Do not mix with crop/field data
+              स्वतंत्र गोपालन व पशुधन विभाग • Separate from crop/field data
             </p>
           </div>
 
@@ -364,15 +371,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             <button
               type="button"
-              onClick={() => onOpenAction('livestock', 'add_animal')}
+              onClick={() => {
+                if (onSetHasAnimalsChoice) onSetHasAnimalsChoice('yes');
+                onOpenAction('livestock', 'add_animal');
+              }}
               className="bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
             >
-              <span>+ नवीन जनावर</span>
+              <span>+ नवीन जनावर / Add Animal</span>
             </button>
           </div>
         </div>
 
-        {/* Active Animal Banner */}
+        {/* Active Animal Banner or Entry Gate */}
         {activeAnimal ? (
           <div
             onClick={onOpenAnimalSelector || (() => onOpenAction('livestock', 'overview'))}
@@ -414,24 +424,51 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
         ) : (
-          <div
-            onClick={() => onOpenAction('livestock', 'add_animal')}
-            className="p-3.5 bg-white hover:bg-amber-50 rounded-2xl border border-dashed border-amber-300 flex items-center justify-between gap-3 cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🐮</span>
+          <div className="bg-white rounded-2xl border border-amber-200 p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">🐄</span>
               <div>
-                <h4 className="text-xs font-bold text-stone-800">
-                  तुमच्याकडे गाई, म्हशी, शेळ्या किंवा बैल आहेत का?
-                </h4>
-                <p className="text-[11px] text-stone-500">
-                  आरोग्य तपासणी, लसीकरण आणि दुग्ध नोंदीसाठी पहिले जनावर नोंदवा.
+                <h3 className="font-extrabold text-stone-900 text-sm">
+                  तुमच्याकडे पशू किंवा जनावरे आहेत का? (Do you have any animals?)
+                </h3>
+                <p className="text-xs text-stone-600 mt-0.5 leading-relaxed">
+                  तुम्ही गाई, म्हशी, शेळ्या, मेंढ्या किंवा कोंबड्या पाळता का? हा विभाग पूर्णपणे ऐच्छिक आहे.
                 </p>
               </div>
             </div>
-            <span className="bg-amber-800 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-xs shrink-0">
-              + जोडा
-            </span>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSetHasAnimalsChoice) onSetHasAnimalsChoice('yes');
+                  onOpenAction('livestock', 'add_animal');
+                }}
+                className="w-full bg-amber-800 hover:bg-amber-900 text-white font-extrabold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <span>🐄 होय, माझ्याकडे पशू आहेत</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSetHasAnimalsChoice) onSetHasAnimalsChoice('no');
+                }}
+                className="w-full bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold py-2 px-3 rounded-xl text-xs border border-stone-300 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>🚫 नाही, पशू नाहीत</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSetHasAnimalsChoice) onSetHasAnimalsChoice('skip');
+                }}
+                className="w-full bg-stone-100 hover:bg-stone-200 text-stone-700 font-medium py-2 px-3 rounded-xl text-xs border border-stone-200 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>⏩ नंतर सांगा / Skip</span>
+              </button>
+            </div>
           </div>
         )}
 
