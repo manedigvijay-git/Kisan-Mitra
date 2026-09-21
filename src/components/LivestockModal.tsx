@@ -15,6 +15,7 @@ import {
   PhoneCall,
   Clock,
   Mic,
+  MicOff,
   Camera,
   Layers,
   Sparkles,
@@ -23,6 +24,11 @@ import {
   FileText,
   Trash2,
   CheckCircle2,
+  Volume2,
+  VolumeX,
+  MessageSquare,
+  Send,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Animal,
@@ -37,10 +43,13 @@ import {
   MilkRecord,
   BreedingRecord,
   FarmTask,
+  AnimalQuestionResult,
 } from '../types';
+import { SpeechService, createSpeechRecognizer } from '../utils/speech';
 
 export type LivestockTabKey =
   | 'overview'
+  | 'ask'
   | 'health'
   | 'milk'
   | 'vaccines'
@@ -148,6 +157,16 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
   const [reminderCategory, setReminderCategory] = useState<'animal_vaccination' | 'animal_health' | 'animal_breeding' | 'general'>('animal_health');
   const [reminderNotes, setReminderNotes] = useState('');
   const [savedReminderSuccess, setSavedReminderSuccess] = useState(false);
+
+  // Animal Question Answering State (Voice, Text, Photo)
+  const [animalQuestion, setAnimalQuestion] = useState('');
+  const [animalQuestionPhoto, setAnimalQuestionPhoto] = useState<string | null>(null);
+  const [isAnsweringQuestion, setIsAnsweringQuestion] = useState(false);
+  const [questionAnswerResult, setQuestionAnswerResult] = useState<AnimalQuestionResult | null>(null);
+  const [isListeningVoice, setIsListeningVoice] = useState(false);
+  const [speechRecognizerInstance, setSpeechRecognizerInstance] = useState<any>(null);
+  const [isSpeakingResult, setIsSpeakingResult] = useState(false);
+  const [questionError, setQuestionError] = useState<string | null>(null);
 
   // Health Check Form
   const [healthSymptoms, setHealthSymptoms] = useState('');
@@ -311,6 +330,165 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
     setTimeout(() => setSavedReminderSuccess(false), 3000);
     setReminderTitle('');
     setReminderNotes('');
+  };
+
+  // Quick question examples
+  const getQuickQuestions = (type: AnimalType = 'cow') => {
+    if (language === 'hi') {
+      return [
+        'मेरी गाय/भैंस चारा नहीं खा रही है, क्या करें?',
+        'पशु को बुखार है और सुस्त है, क्या उपाय करें?',
+        'अचानक दूध कम हो गया है, कारण और उपचार बताएं',
+        'पशु का पेट फूल गया है (Bloat/Afra)',
+        type === 'goat' ? 'बकरी के लिए सबसे अच्छा संतुलित आहार क्या है?' : 'पशु को हरा व सूखा चारा कितना देना चाहिए?',
+        'थनैला (Mastitis) के लक्षण और प्राथमिक उपचार क्या हैं?',
+      ];
+    }
+    if (language === 'en') {
+      return [
+        'My animal is not eating feed. What should I do?',
+        'My cow/buffalo has a fever, what first-aid to give?',
+        'Sudden milk yield drop: causes and solutions',
+        'Animal stomach is bloated (Tympany/Bloat)',
+        type === 'goat' ? 'What is the best feeding guide for goats?' : 'Balanced daily fodder ratio for dairy cattle',
+        'My dog is vomiting. What should I do?',
+      ];
+    }
+    // Marathi default
+    return [
+      'माझी गाय/म्हैस चारा खात नाही, काय करावे?',
+      'जनावराला ताप आहे व अंग गरम आहे, काय उपाय करावा?',
+      'अचानक दूध कमी झाले, काय कारण असावे?',
+      'जनावराचे पोट फुगले आहे (अफरा/Bloat)',
+      type === 'goat' ? 'शेळीला कोणता पौष्टिक आहार द्यावा?' : 'दुभत्या जनावराचा दैनंदिन खुराक व आहार कसा असावा?',
+      'कासेला सूज किंवा दुधात गाठी (कासदाह/Mastitis) उपाय',
+    ];
+  };
+
+  // Handle Ask Animal Question (Voice / Text / Photo)
+  const handleAskAnimalQuestion = async (queryText?: string) => {
+    const textToAsk = (queryText || animalQuestion).trim();
+    if (!textToAsk) return;
+
+    setIsAnsweringQuestion(true);
+    setQuestionError(null);
+
+    // Stop voice listening if active
+    if (isListeningVoice && speechRecognizerInstance) {
+      try {
+        speechRecognizerInstance.stop();
+      } catch (e) {}
+      setIsListeningVoice(false);
+    }
+
+    try {
+      const response = await fetch('/api/ai/animal-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          animal: currentAnimal,
+          animalId: currentAnimal?.id,
+          question: textToAsk,
+          imageBase64: animalQuestionPhoto || undefined,
+          language,
+        }),
+      });
+
+      const data = await response.json();
+      const resPayload = data?.result || data?.answer || (data?.directAnswer ? data : null);
+      if (resPayload) {
+        setQuestionAnswerResult(resPayload);
+      } else {
+        throw new Error(data?.error || 'Failed to get answer');
+      }
+    } catch (err: any) {
+      console.error('Animal question error:', err);
+      setQuestionError(
+        language === 'hi'
+          ? 'उत्तर प्राप्त करने में समस्या हुई। कृपया पुनः प्रयास करें।'
+          : language === 'en'
+          ? 'Could not fetch animal advice. Please try again.'
+          : 'उत्तर मिळवण्यात अडचण आली. कृपया पुन्हा प्रयत्न करा.'
+      );
+    } finally {
+      setIsAnsweringQuestion(false);
+    }
+  };
+
+  // Toggle Voice Input
+  const handleToggleVoiceQuestion = () => {
+    if (isListeningVoice) {
+      if (speechRecognizerInstance) {
+        try {
+          speechRecognizerInstance.stop();
+        } catch (e) {}
+      }
+      setIsListeningVoice(false);
+      return;
+    }
+
+    const langCode = (language === 'hi' ? 'hi' : language === 'en' ? 'en' : 'mr') as 'mr' | 'hi' | 'en';
+    const recognizer = createSpeechRecognizer(
+      langCode,
+      (transcript: string) => {
+        if (transcript) {
+          setAnimalQuestion(transcript);
+        }
+      },
+      (err: any) => {
+        console.warn('Voice recognizer error:', err);
+        setIsListeningVoice(false);
+      },
+      () => {
+        setIsListeningVoice(false);
+      }
+    );
+
+    if (recognizer) {
+      setSpeechRecognizerInstance(recognizer);
+      setIsListeningVoice(true);
+      try {
+        recognizer.start();
+      } catch (e) {
+        console.warn('Start voice failed:', e);
+        setIsListeningVoice(false);
+      }
+    } else {
+      alert(
+        language === 'hi'
+          ? 'इस ब्राउज़र में वॉइस पहचान उपलब्ध नहीं है।'
+          : language === 'en'
+          ? 'Voice recognition not supported in this browser.'
+          : 'या ब्राउझरमध्ये व्हॉइस इनपुट उपलब्ध नाही. कृपया टाइप करा.'
+      );
+    }
+  };
+
+  // Toggle Audio Speech of AI Answer
+  const handleSpeakAnswer = (textToSpeak: string) => {
+    if (isSpeakingResult) {
+      SpeechService.stop();
+      setIsSpeakingResult(false);
+    } else {
+      const langCode = (language === 'hi' ? 'hi' : language === 'en' ? 'en' : 'mr') as 'mr' | 'hi' | 'en';
+      SpeechService.speak(textToSpeak, langCode);
+      setIsSpeakingResult(true);
+      setTimeout(() => {
+        setIsSpeakingResult(false);
+      }, 15000);
+    }
+  };
+
+  // Photo change handler for question
+  const handleQuestionPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAnimalQuestionPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Quick symptom clicker
@@ -548,6 +726,18 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('ask')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+              activeTab === 'ask'
+                ? 'bg-amber-800 text-white shadow-xs'
+                : 'text-amber-900 bg-amber-200/70 hover:bg-amber-200 border border-amber-300'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+            <span>प्रश्न विचारा (Ask AI)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('health')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
               activeTab === 'health'
@@ -712,7 +902,18 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                   ) : null}
 
                   {/* Quick Action Cards inside Overview */}
-                  <div className="grid grid-cols-2 gap-2 pt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+                    <button
+                      onClick={() => setActiveTab('ask')}
+                      className="p-3 rounded-xl bg-gradient-to-r from-amber-100 to-amber-50 hover:from-amber-200 hover:to-amber-100 border border-amber-300 text-left transition-all cursor-pointer shadow-xs"
+                    >
+                      <div className="text-amber-900 font-extrabold text-xs flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        <span>प्रश्न विचारा (Ask AI)</span>
+                      </div>
+                      <p className="text-[10px] text-amber-800 mt-1">चारा, आजार, दूध व औषधांबद्दल विचारा</p>
+                    </button>
+
                     <button
                       onClick={() => setActiveTab('health')}
                       className="p-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-left transition-all cursor-pointer"
@@ -788,6 +989,385 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: ASK ANIMAL QUESTION (Q&A via Voice, Text, Photo) */}
+          {activeTab === 'ask' && (
+            <div className="space-y-4 animate-fadeIn">
+              {/* Active Animal Banner */}
+              <div className="bg-gradient-to-r from-amber-800 to-amber-900 text-white p-3.5 rounded-2xl flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-amber-700/80 flex items-center justify-center text-2xl border border-amber-600/50 shadow-inner">
+                    {getEmoji(currentAnimal?.type)}
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm flex items-center gap-2">
+                      <span>{currentAnimal?.name || 'पशू'}</span>
+                      <span className="text-[10px] bg-amber-700/80 text-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                        {currentAnimal?.type === 'cow'
+                          ? 'गाय (Cow)'
+                          : currentAnimal?.type === 'buffalo'
+                          ? 'म्हैस (Buffalo)'
+                          : currentAnimal?.type === 'bull'
+                          ? 'बैल (Bull)'
+                          : currentAnimal?.type === 'goat'
+                          ? 'शेळी (Goat)'
+                          : 'पशू (Animal)'}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-amber-200 mt-0.5">
+                      जात: {currentAnimal?.breed || 'स्थानिक'} • वय: {currentAnimal?.ageYears || 3} वर्षे • आरोग्य इतिहास व दुग्ध नोंदी समाविष्ट
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenExpert}
+                  className="bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl border border-white/20 flex items-center gap-1 cursor-pointer shrink-0 transition-colors"
+                >
+                  <PhoneCall className="w-3.5 h-3.5 text-amber-300" />
+                  <span>तज्ज्ञ कॉल</span>
+                </button>
+              </div>
+
+              {/* Question Input Box */}
+              <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-stone-800 flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-amber-700" />
+                    <span>तुमचा प्रश्न विचारा (बोलून, लिहून किंवा फोटो जोडून):</span>
+                  </label>
+                  <span className="text-[10px] text-stone-500 font-semibold">
+                    {language === 'hi' ? 'हिंदी' : language === 'en' ? 'English' : 'मराठी'}
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <textarea
+                    value={animalQuestion}
+                    onChange={(e) => setAnimalQuestion(e.target.value)}
+                    placeholder={
+                      language === 'hi'
+                        ? 'उदा. मेरी गाय चारा नहीं खा रही है, क्या करें? या पशु को बुखार है...'
+                        : language === 'en'
+                        ? 'e.g., My cow is not eating. What should I do? Or my goat has fever...'
+                        : 'उदा. माझी गाय चारा खात नाही, काय करावे? किंवा शेळीला कोणता आहार द्यावा?...'
+                    }
+                    rows={3}
+                    className="w-full p-3 bg-stone-50 border border-stone-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-600 focus:bg-white focus:outline-hidden transition-all pr-12"
+                  />
+                  {animalQuestion && (
+                    <button
+                      type="button"
+                      onClick={() => setAnimalQuestion('')}
+                      className="absolute top-2.5 right-2.5 text-stone-400 hover:text-stone-600 p-1 text-xs cursor-pointer"
+                      title="Clear"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Photo Preview if attached */}
+                {animalQuestionPhoto && (
+                  <div className="flex items-center gap-3 bg-amber-50/60 p-2.5 rounded-xl border border-amber-200">
+                    <img
+                      src={animalQuestionPhoto}
+                      alt="Question Attachment"
+                      className="w-14 h-14 object-cover rounded-lg border border-amber-300"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-amber-950">फोटो जोडला गेला आहे</p>
+                      <p className="text-[10px] text-amber-700">AI लक्षणांसोबत फोटोचेही विश्लेषण करेल</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAnimalQuestionPhoto(null)}
+                      className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg cursor-pointer"
+                      title="Remove photo"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Input Action Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div className="flex items-center gap-2">
+                    {/* Voice Mic Button */}
+                    <button
+                      type="button"
+                      onClick={handleToggleVoiceQuestion}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                        isListeningVoice
+                          ? 'bg-rose-600 text-white animate-pulse ring-2 ring-rose-300 shadow-md'
+                          : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                      }`}
+                    >
+                      {isListeningVoice ? (
+                        <>
+                          <MicOff className="w-3.5 h-3.5 animate-bounce" />
+                          <span>ऐकत आहे... (थांबवा)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="w-3.5 h-3.5 text-amber-800" />
+                          <span>माईकवर बोला (Voice)</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Camera / Photo Upload Button */}
+                    <label className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors">
+                      <Camera className="w-3.5 h-3.5 text-stone-600" />
+                      <span>{animalQuestionPhoto ? 'फोटो बदला' : 'फोटो जोडा'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleQuestionPhotoChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Ask Submit Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleAskAnimalQuestion()}
+                    disabled={isAnsweringQuestion || !animalQuestion.trim()}
+                    className="px-5 py-2.5 bg-amber-800 hover:bg-amber-900 disabled:opacity-50 text-white font-extrabold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all active:scale-[0.98]"
+                  >
+                    {isAnsweringQuestion ? (
+                      <>
+                        <Sparkles className="w-4 h-4 animate-spin text-amber-300" />
+                        <span>उत्तर शोधत आहे...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>उत्तर मिळवा (Ask AI)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Sample Questions Chips */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-stone-600 flex items-center gap-1">
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-700" />
+                  <span>शेतकऱ्यांनी विचारलेले नेहमीचे प्रश्न (उदाहरणे):</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {getQuickQuestions(currentAnimal?.type).map((q, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setAnimalQuestion(q);
+                        handleAskAnimalQuestion(q);
+                      }}
+                      className="px-2.5 py-1 bg-white hover:bg-amber-100 hover:border-amber-300 text-stone-800 text-[11px] font-semibold rounded-lg border border-stone-200 transition-colors text-left cursor-pointer shadow-2xs"
+                    >
+                      💬 {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Question Error Alert */}
+              {questionError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{questionError}</span>
+                </div>
+              )}
+
+              {/* AI Question Answer Result Display */}
+              {questionAnswerResult && (
+                <div className="bg-white rounded-2xl border-2 border-amber-300 p-4 shadow-md space-y-4 animate-fadeIn">
+                  {/* Emergency Alert Banner */}
+                  {questionAnswerResult.isEmergency && (
+                    <div className="bg-red-600 text-white p-3.5 rounded-xl flex items-start gap-3 shadow-md animate-pulse">
+                      <AlertTriangle className="w-6 h-6 shrink-0 text-amber-300 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-black text-sm">🚨 तातडीचा पशुवैद्यकीय इशारा (Emergency)</h4>
+                        <p className="text-xs text-white/95 mt-1 leading-relaxed">
+                          {questionAnswerResult.emergencyReason ||
+                            'ही लक्षणे गंभीर आजाराचे संकेत असू शकतात. घरगुती उपायांवर अवलंबून न राहता तात्काळ सरकारी पशुवैद्यकीय दवाखान्याशी संपर्क साधा!'}
+                        </p>
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={onOpenExpert}
+                            className="bg-white hover:bg-stone-100 text-red-700 font-black text-xs px-3.5 py-1.5 rounded-lg cursor-pointer shadow-xs flex items-center gap-1.5"
+                          >
+                            <PhoneCall className="w-3.5 h-3.5" />
+                            <span>📞 पशुवैद्यकीय डॉक्टर / हेल्पलाईन संपर्क</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Direct Spoken Answer Header & Voice Speaker */}
+                  <div className="bg-amber-50/80 p-3.5 rounded-xl border border-amber-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-base">🐄</span>
+                        <h5 className="font-extrabold text-amber-950 text-xs uppercase tracking-wide">
+                          पशु सल्ला व मार्गदर्शन (AI Guidance):
+                        </h5>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleSpeakAnswer(
+                            questionAnswerResult.spokenSummary || questionAnswerResult.directAnswer
+                          )
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          isSpeakingResult
+                            ? 'bg-amber-700 text-white animate-pulse'
+                            : 'bg-white hover:bg-amber-100 text-amber-900 border border-amber-300'
+                        }`}
+                      >
+                        {isSpeakingResult ? (
+                          <>
+                            <VolumeX className="w-3.5 h-3.5" />
+                            <span>थांबवा</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3.5 h-3.5 text-amber-700" />
+                            <span>ऐका (Audio)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-stone-800 leading-relaxed font-medium whitespace-pre-line">
+                      {questionAnswerResult.directAnswer}
+                    </p>
+                  </div>
+
+                  {/* Possible Causes */}
+                  {questionAnswerResult.possibleCauses && questionAnswerResult.possibleCauses.length > 0 && (
+                    <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-1.5">
+                      <h5 className="font-extrabold text-stone-900 text-xs flex items-center gap-1.5">
+                        <span className="text-amber-700">●</span> संभाव्य कारणे (Possible Causes):
+                      </h5>
+                      <ul className="list-disc list-inside text-xs text-stone-700 space-y-1 pl-1">
+                        {questionAnswerResult.possibleCauses.map((cause, i) => (
+                          <li key={i}>{cause}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* What to Check */}
+                  {questionAnswerResult.whatToCheck && questionAnswerResult.whatToCheck.length > 0 && (
+                    <div className="bg-sky-50 p-3 rounded-xl border border-sky-200 space-y-1.5">
+                      <h5 className="font-extrabold text-sky-950 text-xs flex items-center gap-1.5">
+                        <span>🔍</span> जनावरामध्ये तुम्ही प्रत्यक्ष काय तपासावे? (What to Observe):
+                      </h5>
+                      <ul className="text-xs text-sky-900 space-y-1">
+                        {questionAnswerResult.whatToCheck.map((item, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-sky-500">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Safe Care & Remedies */}
+                  {questionAnswerResult.safeCareAndRemedies && questionAnswerResult.safeCareAndRemedies.length > 0 && (
+                    <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 space-y-1.5">
+                      <h5 className="font-extrabold text-emerald-950 text-xs flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>सुरक्षित प्राथमिक काळजी व घरगुती उपाय (Safe Care & Remedies):</span>
+                      </h5>
+                      <ul className="text-xs text-emerald-900 space-y-1.5">
+                        {questionAnswerResult.safeCareAndRemedies.map((step, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Nutrition & Diet advice */}
+                  {questionAnswerResult.dietOrNutritionAdvice && questionAnswerResult.dietOrNutritionAdvice.length > 0 && (
+                    <div className="bg-amber-50/90 p-3 rounded-xl border border-amber-200 space-y-1.5">
+                      <h5 className="font-extrabold text-amber-950 text-xs flex items-center gap-1.5">
+                        <Wheat className="w-4 h-4 text-amber-700" />
+                        <span>चारा व आहार नियोजन (Diet & Nutrition):</span>
+                      </h5>
+                      <ul className="text-xs text-amber-900 space-y-1">
+                        {questionAnswerResult.dietOrNutritionAdvice.map((diet, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-amber-700">•</span>
+                            <span>{diet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Warning Signs */}
+                  {questionAnswerResult.warningSigns && questionAnswerResult.warningSigns.length > 0 && (
+                    <div className="bg-rose-50 p-3 rounded-xl border border-rose-200 space-y-1.5">
+                      <h5 className="font-extrabold text-rose-950 text-xs flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-rose-600" />
+                        <span>धोक्याची लक्षणे — तात्काळ डॉक्टर बोलवा (Red Flags):</span>
+                      </h5>
+                      <ul className="text-xs text-rose-900 space-y-1">
+                        {questionAnswerResult.warningSigns.map((w, i) => (
+                          <li key={i} className="flex items-start gap-1.5">
+                            <span className="text-rose-600 font-bold">•</span>
+                            <span>{w}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Follow-up Questions to continue asking */}
+                  {questionAnswerResult.suggestedFollowUps && questionAnswerResult.suggestedFollowUps.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <h6 className="text-[11px] font-bold text-stone-600">
+                        संबंधित पुढील प्रश्न (क्लिक करून विचारा):
+                      </h6>
+                      <div className="flex flex-wrap gap-1.5">
+                        {questionAnswerResult.suggestedFollowUps.map((fq, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              setAnimalQuestion(fq);
+                              handleAskAnimalQuestion(fq);
+                            }}
+                            className="px-2.5 py-1 bg-stone-100 hover:bg-amber-100 hover:border-amber-300 text-stone-800 text-[11px] font-semibold rounded-lg border border-stone-200 transition-colors text-left cursor-pointer"
+                          >
+                            👉 {fq}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Safety Disclaimer */}
+                  <div className="text-[10px] text-stone-500 bg-stone-100 p-2.5 rounded-xl text-center leading-relaxed">
+                    ℹ️ {questionAnswerResult.veterinaryDisclaimer ||
+                      'सदर सल्ला केवळ मार्गदर्शनासाठी आहे, हे वैद्यकीय अंतिम निदान नाही. गंभीर लक्षणे आढळल्यास अधिकृत पशुवैद्यकीय डॉक्टरांचा सल्ला घ्या.'}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

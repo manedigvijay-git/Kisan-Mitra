@@ -472,6 +472,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         )}
 
+        {/* Ask Question Quick Banner for Selected Animal */}
+        {activeAnimal && (
+          <button
+            type="button"
+            onClick={() => onOpenAction('livestock', 'ask')}
+            className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-700 via-amber-800 to-amber-900 text-white flex items-center justify-between gap-2 shadow-xs hover:shadow-sm cursor-pointer transition-all hover:brightness-105 active:scale-[0.99] border border-amber-600/60 text-left"
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-xl bg-amber-600/80 flex items-center justify-center text-xl shadow-inner shrink-0">
+                ✨
+              </span>
+              <div>
+                <div className="text-xs font-black text-amber-200 flex items-center gap-1.5">
+                  <span>{activeAnimal.name} बद्दल प्रश्न विचारा (Ask AI)</span>
+                  <span className="bg-amber-500 text-stone-950 text-[10px] font-extrabold px-1.5 py-0.2 rounded-md">
+                    आवाज • फोटो • मजकूर
+                  </span>
+                </div>
+                <div className="text-[11px] text-amber-100 font-medium mt-0.5">
+                  चारा खात नाही, आजार, ताप, औषधोपचार किंवा दूध वाढीबद्दल थेट विचारा
+                </div>
+              </div>
+            </div>
+            <div className="shrink-0 bg-white text-amber-900 font-black text-xs px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1">
+              <span>विचारा</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </button>
+        )}
+
         {/* 8 Core Large Buttons for Simple Livestock Management */}
         <div className="space-y-1.5 pt-1">
           <div className="flex items-center justify-between text-[11px] font-bold text-amber-900 uppercase tracking-wide">

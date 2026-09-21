@@ -240,6 +240,20 @@ export interface Animal {
   updatedAt?: string;
 }
 
+export interface AnimalQuestionResult {
+  directAnswer: string;
+  spokenSummary?: string;
+  possibleCauses?: string[];
+  safeCareAndRemedies?: string[];
+  dietOrNutritionAdvice?: string[];
+  whatToCheck?: string[];
+  isEmergency: boolean;
+  emergencyReason?: string | null;
+  warningSigns?: string[];
+  veterinaryDisclaimer: string;
+  suggestedFollowUps?: string[];
+}
+
 export interface AnimalHealthCheck {
   id: string;
   animalId: string;

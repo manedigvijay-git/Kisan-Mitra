@@ -10,6 +10,7 @@ import {
 import {
   Language,
   FarmerProfile,
+  Field,
   WeatherData,
   FarmDiaryEntry,
   Animal,
@@ -46,6 +47,157 @@ import { LivestockModal } from './components/LivestockModal';
 import { FarmingCalendarModal } from './components/FarmingCalendarModal';
 import { FarmFinanceModal } from './components/FarmFinanceModal';
 import { FarmInventoryModal } from './components/FarmInventoryModal';
+
+const DEFAULT_LOCAL_FIELDS: Field[] = [
+  {
+    id: 'field_1',
+    name: 'विहिरीजवळचे शेत (ऊस)',
+    crop: 'ऊस (Sugarcane)',
+    variety: 'को ८६०३२',
+    acreage: 2.5,
+    acreageUnit: 'एकर (Acres)',
+    sowingDate: '2024-10-15',
+    soilType: 'काळी कसदार (Black Cotton)',
+    cropStage: 'वाढ आणि कांड्या फुटणे (Grand Growth)',
+    recentProblems: [],
+    fertilizerHistory: [],
+    location: {
+      village: 'कोरेगाव',
+      taluka: 'कोरेगाव',
+      district: 'सातारा',
+      state: 'Maharashtra',
+      latitude: 17.68,
+      longitude: 74.00,
+    },
+  },
+  {
+    id: 'field_2',
+    name: 'माळरानावरचे शेत (कापूस)',
+    crop: 'कापूस (Cotton)',
+    variety: 'बीजी-२',
+    acreage: 3.0,
+    acreageUnit: 'एकर (Acres)',
+    sowingDate: '2024-06-25',
+    soilType: 'मध्यम तांबडी (Medium Red)',
+    cropStage: 'बोंडे भरणे व फुलोरा (Boll Development)',
+    recentProblems: [],
+    fertilizerHistory: [],
+    location: {
+      village: 'कोरेगाव',
+      taluka: 'कोरेगाव',
+      district: 'सातारा',
+      state: 'Maharashtra',
+      latitude: 17.68,
+      longitude: 74.00,
+    },
+  },
+];
+
+const DEFAULT_LOCAL_ANIMALS: Animal[] = [
+  {
+    id: 'animal_local_1',
+    name: 'लक्ष्मी',
+    type: 'cow',
+    breed: 'गिर (Gir)',
+    ageYears: 4,
+    ageMonths: 2,
+    sex: 'female',
+    pregnancyStatus: 'not_pregnant',
+    lactationStage: 'lactating',
+    dailyMilkLiters: 12,
+    tagNumber: 'MH-11-2041',
+    notes: 'निरोगी व शांत स्वभावाची गीर गाय',
+    healthRecords: [
+      {
+        id: 'rec_1',
+        animalId: 'animal_local_1',
+        date: '2025-02-15',
+        symptoms: ['नियमित आरोग्य तपासणी - सर्व सामान्य'],
+        symptomsText: 'नियमित आरोग्य तपासणी - सर्व सामान्य',
+        possibleCauses: [],
+      },
+    ],
+    vaccinations: [
+      {
+        id: 'vac_1',
+        animalId: 'animal_local_1',
+        vaccineName: 'लाळ खुरकूत (FMD)',
+        dateAdministered: '2024-11-10',
+        nextDueDate: '2025-05-10',
+        veterinarian: 'डॉ. कदम',
+        notes: 'शासकीय लसीकरण',
+      },
+    ],
+    treatments: [],
+    feedRecords: [
+      {
+        id: 'feed_1',
+        animalId: 'animal_local_1',
+        date: '2025-02-20',
+        feedType: 'concentrate',
+        customFeedName: 'सुका चारा + सरकी पेंढ',
+        quantity: 15,
+        unit: 'kg',
+        feedingTime: 'morning',
+      },
+    ],
+    milkRecords: [
+      {
+        id: 'milk_1',
+        animalId: 'animal_local_1',
+        date: '2025-02-22',
+        morningLiters: 6.5,
+        eveningLiters: 5.5,
+        fatPercentage: 4.2,
+      },
+    ],
+    breedingRecords: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'animal_local_2',
+    name: 'गंगा',
+    type: 'buffalo',
+    breed: 'जाफराबादी / मुऱ्हा (Murrah)',
+    ageYears: 5,
+    sex: 'female',
+    pregnancyStatus: 'not_pregnant',
+    lactationStage: 'lactating',
+    dailyMilkLiters: 14,
+    tagNumber: 'MH-11-2042',
+    notes: 'जास्त दूध देणारी मुऱ्हा म्हैस',
+    healthRecords: [],
+    vaccinations: [],
+    treatments: [],
+    feedRecords: [],
+    milkRecords: [],
+    breedingRecords: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
+
+const DEFAULT_LOCAL_PROFILE: FarmerProfile = {
+  id: 'local_farmer',
+  uid: 'local_farmer',
+  name: 'शेतकरी मित्र',
+  phoneNumber: '',
+  isFirebaseUser: false,
+  profileCompleted: true,
+  preferredLanguage: 'mr',
+  language: 'mr',
+  location: {
+    village: 'कोरेगाव',
+    taluka: 'कोरेगाव',
+    district: 'सातारा',
+    state: 'Maharashtra',
+    latitude: 17.68,
+    longitude: 74.00,
+  },
+  activeFieldId: 'field_1',
+  fields: DEFAULT_LOCAL_FIELDS,
+};
 
 const DEFAULT_TASKS: FarmTask[] = [
   {
@@ -137,21 +289,22 @@ export default function App() {
       const saved = localStorage.getItem('kisan_animals');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Filter out old legacy dummy animals if present
-          return parsed.filter((a: Animal) => a.id !== 'animal_1' && a.id !== 'animal_2');
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const cleaned = parsed.filter((a: Animal) => a.id !== 'animal_1' && a.id !== 'animal_2');
+          if (cleaned.length > 0) return cleaned;
         }
       }
-      return [];
+      return DEFAULT_LOCAL_ANIMALS;
     } catch {
-      return [];
+      return DEFAULT_LOCAL_ANIMALS;
     }
   });
   const [activeAnimalId, setActiveAnimalId] = useState<string>(() => {
     try {
-      return localStorage.getItem('kisan_active_animal_id') || '';
+      const saved = localStorage.getItem('kisan_active_animal_id');
+      return saved || 'animal_local_1';
     } catch {
-      return '';
+      return 'animal_local_1';
     }
   });
   const [hasAnimalsChoice, setHasAnimalsChoiceState] = useState<'yes' | 'no' | 'skip' | undefined>(() => {
@@ -262,11 +415,27 @@ export default function App() {
       if (unsubInventory) { unsubInventory(); unsubInventory = null; }
 
       if (!firebaseUser) {
-        // User is LOGGED OUT
-        setProfile(null);
-        setDiaryEntries([]);
-        localStorage.removeItem('kisan_profile');
-        localStorage.removeItem('kisan_diary');
+        // User is in Local / Offline Farmer mode (or logged out)
+        try {
+          const savedProfile = localStorage.getItem('kisan_profile');
+          if (savedProfile) {
+            const parsed = JSON.parse(savedProfile);
+            if (parsed && (parsed.id || parsed.name)) {
+              setProfile({
+                ...parsed,
+                isFirebaseUser: false,
+                fields: parsed.fields && parsed.fields.length > 0 ? parsed.fields : DEFAULT_LOCAL_FIELDS,
+              });
+              setIsAuthChecking(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Local profile load warning:', e);
+        }
+
+        // Initialize with default local profile
+        setProfile(DEFAULT_LOCAL_PROFILE);
         setIsAuthChecking(false);
         return;
       }
@@ -483,9 +652,11 @@ export default function App() {
       photoUrl: entry.photoUrl,
     };
     setDiaryEntries((prev) => [newEntry, ...prev]);
-    FarmDataSyncService.saveDiaryEntry(profile.uid, newEntry).catch((err) =>
-      console.warn('Sync diary entry notice:', err)
-    );
+    if (profile.isFirebaseUser) {
+      FarmDataSyncService.saveDiaryEntry(profile.uid, newEntry).catch((err) =>
+        console.warn('Sync diary entry notice:', err)
+      );
+    }
   };
 
   const handleSaveSoilToFarm = (soilSummary: string) => {
@@ -496,7 +667,7 @@ export default function App() {
         f.id === prev.activeFieldId ? { ...f, soilHealthSummary: soilSummary } : f
       );
       const updatedField = updatedFields.find((f) => f.id === prev.activeFieldId);
-      if (updatedField && prev.uid) {
+      if (updatedField && prev.uid && prev.isFirebaseUser) {
         FarmDataSyncService.saveField(prev.uid, updatedField).catch((err) =>
           console.warn('Sync field notice:', err)
         );
@@ -513,7 +684,7 @@ export default function App() {
       const exists = prev.some((a) => a.id === animal.id);
       return exists ? prev.map((a) => (a.id === animal.id ? animal : a)) : [animal, ...prev];
     });
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.saveAnimal(profile.uid, animal).catch((err) =>
         console.warn('Sync animal error:', err)
       );
@@ -525,7 +696,7 @@ export default function App() {
     if (activeAnimalId === animalId) {
       setActiveAnimalId(animals.find((a) => a.id !== animalId)?.id || '');
     }
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.deleteAnimal(profile.uid, animalId).catch((err) =>
         console.warn('Delete animal error:', err)
       );
@@ -537,7 +708,7 @@ export default function App() {
       const exists = prev.some((t) => t.id === task.id);
       return exists ? prev.map((t) => (t.id === task.id ? task : t)) : [task, ...prev];
     });
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.saveTask(profile.uid, task).catch((err) =>
         console.warn('Sync task error:', err)
       );
@@ -546,7 +717,7 @@ export default function App() {
 
   const handleDeleteTask = (taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.deleteTask(profile.uid, taskId).catch((err) =>
         console.warn('Delete task error:', err)
       );
@@ -558,7 +729,7 @@ export default function App() {
       const exists = prev.some((r) => r.id === record.id);
       return exists ? prev.map((r) => (r.id === record.id ? record : r)) : [record, ...prev];
     });
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.saveFinanceRecord(profile.uid, record).catch((err) =>
         console.warn('Sync finance error:', err)
       );
@@ -567,7 +738,7 @@ export default function App() {
 
   const handleDeleteFinanceRecord = (recordId: string) => {
     setFinances((prev) => prev.filter((r) => r.id !== recordId));
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.deleteFinanceRecord(profile.uid, recordId).catch((err) =>
         console.warn('Delete finance error:', err)
       );
@@ -579,7 +750,7 @@ export default function App() {
       const exists = prev.some((i) => i.id === item.id);
       return exists ? prev.map((i) => (i.id === item.id ? item : i)) : [item, ...prev];
     });
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.saveInventoryItem(profile.uid, item).catch((err) =>
         console.warn('Sync inventory error:', err)
       );
@@ -588,7 +759,7 @@ export default function App() {
 
   const handleDeleteInventoryItem = (itemId: string) => {
     setInventory((prev) => prev.filter((i) => i.id !== itemId));
-    if (profile?.uid) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.deleteInventoryItem(profile.uid, itemId).catch((err) =>
         console.warn('Delete inventory error:', err)
       );
@@ -682,14 +853,20 @@ export default function App() {
     );
   }
 
-  // 2. Logged-out state: ALWAYS show Login Screen, NEVER show Home or Profile data
+  // 2. Logged-out state: ALWAYS show Login Screen, or allow continuing as local farmer
   if (!profile || !profile.uid) {
     return (
       <div className="min-h-screen bg-stone-950 flex items-center justify-center p-3 font-sans">
         <AuthModal
           language={language}
           profile={null}
-          onClose={undefined}
+          onClose={() => setProfile(DEFAULT_LOCAL_PROFILE)}
+          onLoginSuccess={(newProf) => {
+            setProfile(newProf);
+            try {
+              localStorage.setItem('kisan_profile', JSON.stringify(newProf));
+            } catch (e) {}
+          }}
           initialTab={authInitialTab}
           isFullScreen={true}
         />
@@ -984,6 +1161,13 @@ export default function App() {
           profile={profile}
           onClose={handleCloseModal}
           initialTab={authInitialTab}
+          onLoginSuccess={(newProf) => {
+            setProfile(newProf);
+            try {
+              localStorage.setItem('kisan_profile', JSON.stringify(newProf));
+            } catch (e) {}
+            handleCloseModal();
+          }}
           onTriggerOnboarding={() => setActiveModal('onboarding')}
         />
       )}
