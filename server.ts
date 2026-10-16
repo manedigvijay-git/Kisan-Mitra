@@ -311,7 +311,39 @@ function getCropAnalysisFallback(cropName: string = 'कापूस (Cotton)', 
       : isHi
       ? ['क्या पत्ती की निचली सतह पर छोटे कीड़े या जाला दिखाई दे रहा है?']
       : ['Are tiny insects visible on the underside of leaves?'],
+    directAnswer: isMr
+      ? `आपल्या ${cropName} पिकावर रसशोषक किडींचा (थ्रिप्स व तुडतुडे) प्रादुर्भाव झालेला आहे. ५% निंबोळी अर्क किंवा योग्य कीटकनाशकाची फवारणी करून हे त्वरित नियंत्रणात आणा.`
+      : isHi
+      ? `आपकी ${cropName} फसल पर रस चूसक कीटों (थ्रिप्स व माहू) का प्रकोप है। 5% नीम अर्क या अनुशंसित कीटनाशक का छिड़काव तुरंत करें।`
+      : `Sucking pest infestation (thrips & jassids) identified on your ${cropName}. Treat promptly with 5% neem extract or recommended formulation.`,
+    stepByStepSteps: isMr
+      ? [
+          '१. शेतात एकरी १० पिवळे व १० निळे चिकट सापळे पिकाच्या उंचीवर लावा.',
+          '२. निंबोळी अर्क ५% किंवा निम तेल (१०,००० पीपीएम) @ २.५ मिली प्रति लिटर पाण्यात मिसळून संपूर्ण पिकावर फवारा.',
+          '३. किडींचा प्रादुर्भाव जास्त असल्यास ॲसिटामिप्रीड २०% एसपी @ ०.४ ग्रॅम प्रति लिटर किंवा थायामेथोक्साम २५% डब्ल्यूजी @ ०.३ ग्रॅम प्रति लिटर फवारा.',
+          '४. युरिया खताचा अतिरिक्त वापर त्वरित थांबवा, कारण जास्त नत्रामुळे किडींचे प्रमाण वाढते.'
+        ]
+      : isHi
+      ? [
+          '1. खेत में प्रति एकड़ 10 पीले और 10 नीले चिपचिपे ट्रैप लगाएं।',
+          '2. 5% नीम अर्क या नीम तेल (10,000 पीपीएम) 2.5 मिली प्रति लीटर पानी में मिलाकर छिड़कें।',
+          '3. प्रकोप अधिक होने पर एसिटामिप्रिड 20% एसपी @ 0.4 ग्राम या थायमेथॉक्सम 25% डब्ल्यूजी @ 0.3 ग्राम प्रति लीटर छिड़कें।',
+          '4. अतिरिक्त यूरिया का प्रयोग तुरंत रोकें।'
+        ]
+      : [
+          '1. Install 10 yellow and 10 blue sticky traps per acre at canopy level.',
+          '2. Spray 5% neem extract or 10,000 ppm neem oil @ 2.5 ml per liter water.',
+          '3. If infestation is severe, spray Acetamiprid 20% SP @ 0.4g/L or Thiamethoxam 25% WG @ 0.3g/L.',
+          '4. Cease excessive nitrogen/urea applications immediately.'
+        ],
+    recommendedScanReason: null,
+    immediateFirstAid: isMr
+      ? 'तातडीने शेतातील तण काढून टाका आणि झाडांची हवा खेळती राहील याची खात्री करा.'
+      : isHi
+      ? 'खेत से तुरंत खरपतवार निकालें और पौधों के बीच हवा का प्रवाह बनाए रखें।'
+      : 'Clear weed hosts around the field and ensure good aeration.',
     expertEscalationRecommended: false,
+    expertEscalationReason: null,
   };
 }
 
@@ -538,29 +570,37 @@ app.post('/api/crop/analyze', async (req: Request, res: Response) => {
 
     const langName = language === 'mr' ? 'Marathi (मराठी)' : language === 'hi' ? 'Hindi (हिंदी)' : 'English';
 
-    const prompt = `You are a certified senior Indian agricultural extension specialist and crop doctor.
-Analyze this crop photo for an Indian farmer.
-Context provided:
-- Crop: ${cropName || 'Not specified (identify from image if possible)'}
+    const prompt = `You are an expert, practical agricultural assistant helping Indian farmers with crop management, soil health, pest control, weather preparation, and farming techniques.
+Analyze this crop condition for a farmer based on ${imageBase64 ? 'the provided photo and ' : ''}symptoms described.
+
+Farmer & Crop Context:
+- Crop: ${cropName || 'Not specified (identify from photo/symptoms if possible)'}
 - Growth Stage: ${cropStage || 'Not specified'}
 - Plant Part: ${partType || 'Leaf/Plant'}
-- Farmer Notes: ${userNotes || 'None'}
+- Farmer's Described Symptoms / Notes: ${effectiveNotes || 'None'}
 - Target Response Language: ${langName}
 
-CRITICAL AGRONOMIC SAFETY DIRECTIVES:
-1. NEVER provide a false sense of certainty.
-2. Confidence level MUST strictly be one of:
-   - "HIGH": Clear classic symptoms matching known disease/pest/deficiency with high visual clarity.
-   - "MODERATE": Likely symptom match, but could overlap with 2+ causes or image lacks extreme closeup.
-   - "LOW": Blurry, distant, ambiguous, or multiple conflicting symptoms.
-3. If confidence is MODERATE or LOW, explicitly state what additional photo (e.g. underside of leaf, stem cross-section) or field inspection is required.
-4. Distinguish between:
-   - Pest attack (e.g., thrips, aphids, pink bollworm, spodoptera)
-   - Fungal/bacterial disease (e.g., blight, powdery mildew, wilt, leaf spot)
-   - Nutrient deficiency (e.g., Nitrogen yellowing, Potassium leaf margin scorching, Zinc interveinal chlorosis)
-   - Physical/environmental stress (heat scorch, waterlogging, chemical drift)
-5. Provide simple farmer-friendly explanations without heavy academic jargon, but include scientifically verified active recommendations (organic/cultural first, then recommended safe chemical formulations with exact dilution e.g. "2 ml per liter water").
-6. Provide output in STRICT JSON matching the schema below. Both language specific text in '${langName}' AND English technical names for record keeping.
+CORE INSTRUCTIONS:
+1. Direct Answers First: Always answer the farmer's question directly, clearly, and concisely using proven agricultural best practices. Present a direct answer in "directAnswer" that immediately diagnoses and solves the core issue.
+2. Step-by-Step Guidance: If a solution involves multiple steps (e.g., fertilizer application, organic pesticide preparation, irrigation schedules), list them in a simple numbered format in "stepByStepSteps" (e.g. ["1. ...", "2. ...", "3. ..."]).
+3. Language & Tone: Keep language simple, supportive, and accessible in ${langName}. Avoid overly dense scientific jargon unless explaining a common term.
+
+WHEN TO RECOMMEND A CROP SCAN:
+- Do NOT refuse to answer just because an image is missing! If only symptoms are described, formulate the diagnosis directly based on the description.
+- Only suggest taking a crop scan or photo as a secondary recommendation when diagnosing an ambiguous visible disease, pest infestation, or leaf discoloration (e.g., "Based on your description, this could be early blight. For a precise confirmation, you can also upload a clear photo of the infected leaf."). If symptoms are clear or image was already provided, set "recommendedScanReason" to null.
+
+WHEN TO REFER TO AN EXPERT:
+- Only suggest calling a local agronomist, extension office, or helpline for severe crop emergencies, large-scale chemical toxicity, or rare regional conditions requiring an in-person farm inspection.
+- ALWAYS provide immediate first-aid or mitigation advice in "immediateFirstAid" before suggesting an expert call.
+
+CRITICAL AGRONOMIC DIAGNOSTIC RULES:
+- Distinguish between pest attacks, fungal/bacterial diseases, nutrient deficiencies (N, P, K, Fe, Zn), and environmental stress.
+- Confidence level MUST strictly be one of:
+   - "HIGH": Clear classic symptoms matching known disease/pest/deficiency.
+   - "MODERATE": Likely symptom match, but could overlap with 2+ causes.
+   - "LOW": Distant, highly ambiguous, or conflicting symptoms.
+- Provide scientifically verified active recommendations: cultural & organic remedies first, followed by safe chemical formulations with exact dilution (e.g. "2 ml per liter water" or "grams per 15L pump").
+- Output STRICT JSON matching the schema below.
 
 Output JSON Schema:
 {
@@ -570,14 +610,19 @@ Output JSON Schema:
   "category": "pest" | "disease" | "deficiency" | "environmental" | "healthy" | "uncertain",
   "confidenceLevel": "HIGH" | "MODERATE" | "LOW",
   "confidenceScore": number (0 to 100),
-  "confidenceReason": "string (explanation of why confidence is high or why uncertain in ${langName})",
+  "confidenceReason": "string (explanation in ${langName})",
+  "directAnswer": "string (direct, clear, concise solution in ${langName})",
+  "stepByStepSteps": ["string (numbered step 1)", "string (numbered step 2)"],
   "symptomsObserved": ["string in ${langName}"],
   "immediateAction": "string (urgent practical step in ${langName})",
+  "immediateFirstAid": "string or null (practical first-aid or damage mitigation in ${langName})",
   "safeTreatmentOrganic": ["string in ${langName}"],
   "safeTreatmentChemical": ["string with exact dosage in ${langName}"],
   "preventionTips": ["string in ${langName}"],
   "questionsForFarmer": ["string (questions to clarify condition in ${langName})"],
-  "expertEscalationRecommended": boolean
+  "recommendedScanReason": "string or null (only if symptoms are ambiguous and a photo would confirm)",
+  "expertEscalationRecommended": boolean,
+  "expertEscalationReason": "string or null"
 }`;
 
     const parts: any[] = [];

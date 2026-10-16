@@ -172,20 +172,33 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
     } catch (err) {
       console.warn('Voice assistant notice:', err);
 
-      // Fallback response based on known query keywords
-      let fallbackText = 'माझ्या माहितीनुसार पिकाचे निरीक्षण करणे आवश्यक आहे.';
-      let buttons: any[] = [{ label: '📸 फोटो काढून तपासा', actionType: 'SCAN_CROP' }];
+      // Fallback response with Direct Answers First & Numbered Steps
+      let fallbackText =
+        language === 'mr'
+          ? 'आपल्या पिकाच्या चांगल्या वाढीसाठी योग्य ओलावा आणि वेळेवर तणनियंत्रण ठेवा.'
+          : language === 'hi'
+          ? 'फसल की अच्छी वृद्धि के लिए उचित नमी और समय पर खरपतवार नियंत्रण रखें।'
+          : 'Ensure optimal moisture and timely weed management for healthy crop growth.';
+      let buttons: any[] = [{ label: '📸 पिकाचा फोटो तपासा', actionType: 'SCAN_CROP' }];
 
       if (textToSend.includes('पिवळ') || textToSend.includes('पीले') || textToSend.includes('yellow')) {
         fallbackText =
-          'पाने पिवळी पडण्याची दोन मुख्य कारणे असू शकतात: नत्र (युरिया) ची कमतरता किंवा खालच्या बाजूला रसशोषक किडी. पानांचा एक जवळून फोटो काढून खात्री करा.';
+          language === 'mr'
+            ? 'पाने पिवळी पडण्यावर थेट उपाय:\n१. शेतात पाणी साचले असल्यास अतिरिक्त पाण्याचा त्वरित निचरा करा.\n२. १९:१९:१९ विद्राव्य खत ५ ग्रॅम प्रति लिटर पाण्यात मिसळून फवारणी करा.\n३. पानाच्या खाली बारीक किडी असल्यास ५% निंबोळी अर्क फवारा.\n(लक्षणे संशयास्पद असल्यास अचूक खात्रीसाठी आपण पानाच्या खालच्या भागाचा फोटोही जोडू शकता.)'
+            : language === 'hi'
+            ? 'पत्तियां पीली पड़ने का सीधा समाधान:\n1. खेत में जलभराव हो तो पानी की तुरंत निकासी करें।\n2. 19:19:19 घुलनशील खाद 5 ग्राम प्रति लीटर पानी में मिलाकर छिड़कें।\n3. पत्ती के नीचे रस चूसक कीट हों तो 5% नीम अर्क का छिड़काव करें।\n(सटीक पुष्टि के लिए आप पत्ती की फोटो भी अपलोड कर सकते हैं।)'
+            : 'Direct solution for yellowing leaves:\n1. Drain any standing water around root zones.\n2. Spray water-soluble 19:19:19 @ 5g per liter water.\n3. If tiny pests are under leaves, spray 5% neem extract.\n(For precise confirmation, you can also upload a clear leaf photo.)';
         buttons = [
-          { label: '📸 पानाचा फोटो काढा', actionType: 'SCAN_CROP' },
-          { label: '📞 तज्ज्ञांशी बोला', actionType: 'CALL_EXPERT' },
+          { label: '📸 पानाचा फोटो जोडा', actionType: 'SCAN_CROP' },
+          { label: '🧴 खताची मात्रा तपासा', actionType: 'CHECK_FERTILIZER' },
         ];
       } else if (textToSend.includes('खत') || textToSend.includes('खाद') || textToSend.includes('fertilizer')) {
         fallbackText =
-          'कोणतेही खत देण्यापूर्वी ते पिकाच्या योग्य अवस्थेत आहे का आणि आधीच्या खताशी विरोध करत नाही ना याची खात्री करणे आवश्यक आहे. खत स्कॅन करा.';
+          language === 'mr'
+            ? 'खत व्यवस्थापनासाठी थेट मार्गदर्शन:\n१. जमिनीत पुरेसा ओलावा असल्यावरच खत द्यावे.\n२. डीएपी व कॅल्शियम नायट्रेट कधीही एकत्र मिसळू नका.\n३. फवारणी करताना पानांच्या खालच्या बाजूवरही द्रावण पोहोचू द्या.'
+            : language === 'hi'
+            ? 'खाद प्रबंधन का सीधा समाधान:\n1. मिट्टी में पर्याप्त नमी होने पर ही खाद दें।\n2. डीएपी और कैल्शियम नाइट्रेट कभी एक साथ न मिलाएं।\n3. छिड़काव सुबह या शाम शांत मौसम में करें।'
+            : 'Direct fertilizer guidance:\n1. Apply fertilizer only when soil has adequate moisture.\n2. Never tank-mix DAP and Calcium Nitrate.\n3. Spray during cool morning hours.';
         buttons = [{ label: '🧴 खताचे पाकीट तपासा', actionType: 'CHECK_FERTILIZER' }];
       }
 
@@ -293,7 +306,28 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                     </button>
                   </div>
                 )}
-                <div>{msg.text}</div>
+                <div className="space-y-1.5">
+                  {msg.text.split('\n').map((line, lIdx) => {
+                    const isStep = /^[0-9१२३४५६७८९]+\.\s*/.test(line.trim());
+                    if (isStep) {
+                      const numberPrefix = line.match(/^[0-9१२३४५६७८९]+\./)?.[0] || '';
+                      const stepContent = line.replace(/^[0-9१२३४५६७८९]+\.\s*/, '');
+                      return (
+                        <div key={lIdx} className="flex items-start gap-1.5 py-0.5 font-medium text-stone-800">
+                          <span className="font-extrabold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[11px] shrink-0">
+                            {numberPrefix}
+                          </span>
+                          <span className="text-stone-800 leading-relaxed">{stepContent}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p key={lIdx} className="leading-relaxed">
+                        {line}
+                      </p>
+                    );
+                  })}
+                </div>
 
                 {/* Safety warning if applicable */}
                 {msg.warning && (

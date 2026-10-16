@@ -71,6 +71,17 @@ export interface TranslationStrings {
   chemicalRemedyLabel: string;
   saveToDiary: string;
   savedToDiarySuccess: string;
+  tabPhotoScan: string;
+  tabSymptomDescribe: string;
+  describeSymptomsPlaceholder: string;
+  speakSymptomsButton: string;
+  diagnoseButton: string;
+  directAnswerLabel: string;
+  stepByStepActionPlanLabel: string;
+  recommendedScanNotice: string;
+  immediateFirstAidLabel: string;
+  callAgronomist: string;
+  kisanCallCenterNotice: string;
 
   // Fertilizer Scanner
   fertilizerScanTitle: string;
@@ -182,6 +193,17 @@ export const translations: Record<Language, TranslationStrings> = {
     chemicalRemedyLabel: '💊 रासायनिक शिफारस (योग्य प्रमाण):',
     saveToDiary: 'शेती डायरीत नोंद करा',
     savedToDiarySuccess: 'नोंद यशस्वीरीत्या शेती डायरीत साठवली गेली!',
+    tabPhotoScan: '📷 पिकाचा फोटो',
+    tabSymptomDescribe: '✍️ लक्षणे वर्णन करा (बोलून/टाईप करून)',
+    describeSymptomsPlaceholder: 'उदा. पानांवर पिवळे ठिपके पडले आहेत, कडा वाकड्या झाल्या आहेत, शेंडे सुकत आहेत...',
+    speakSymptomsButton: 'लक्षणे बोलून सांगा',
+    diagnoseButton: 'तपासणी करा व उपाय मिळवा',
+    directAnswerLabel: 'थेट कृषी सल्ला व निदान (Direct Answer):',
+    stepByStepActionPlanLabel: 'पायरी-पायरीने कृती आराखडा (Step-by-Step Action Plan):',
+    recommendedScanNotice: '📷 अचूक खात्रीसाठी आपण पानाचा किंवा रोगाचा स्पष्ट फोटोही जोडू शकता.',
+    immediateFirstAidLabel: '🚨 तातडीचे प्रथमोपचार व नुकसान रोखण्याचे उपाय:',
+    callAgronomist: '📞 कृषी तज्ज्ञांशी बोला (किसान हेल्पलाइन १८००-१८०-१५५१)',
+    kisanCallCenterNotice: 'मोफत किसान कॉल सेंटर: १८००-१८०-१५५१ (सकाळी ६ ते रात्री १०)',
 
     fertilizerScanTitle: 'खताचे पाकीट किंवा नाव तपासा',
     fertilizerOcrPrompt: 'खताच्या पाकिटाचा स्पष्ट फोटो काढा किंवा नाव निवडा',
@@ -292,6 +314,17 @@ export const translations: Record<Language, TranslationStrings> = {
     chemicalRemedyLabel: '💊 अनुशंसित रासायनिक उपचार (सही मात्रा):',
     saveToDiary: 'कृषि डायरी में दर्ज करें',
     savedToDiarySuccess: 'रिकॉर्ड सफलतापूर्वक कृषि डायरी में सहेजा गया!',
+    tabPhotoScan: '📷 फसल की फोटो',
+    tabSymptomDescribe: '✍️ लक्षण बताएं (बोलकर या लिखकर)',
+    describeSymptomsPlaceholder: 'उदा. पत्तियों पर पीले धब्बे हैं, किनारे मुड़ रहे हैं, ऊपरी शाखाएं सूख रही हैं...',
+    speakSymptomsButton: 'लक्षण बोलकर बताएं',
+    diagnoseButton: 'जांचें और समाधान पाएं',
+    directAnswerLabel: 'सीधा कृषि समाधान (Direct Answer):',
+    stepByStepActionPlanLabel: 'चरण-दर-चरण कार्य योजना (Step-by-Step Action Plan):',
+    recommendedScanNotice: '📷 सटीक पुष्टि के लिए आप पत्ती या प्रभावित भाग की फोटो भी अपलोड कर सकते हैं।',
+    immediateFirstAidLabel: '🚨 तत्काल प्राथमिक उपचार और बचाव के उपाय:',
+    callAgronomist: '📞 कृषि विशेषज्ञ से बात करें (किसान हेल्पलाइन 1800-180-1551)',
+    kisanCallCenterNotice: 'टोल फ्री किसान कॉल सेंटर: 1800-180-1551 (सुबह 6 से रात 10)',
 
     fertilizerScanTitle: 'खाद का पैकेट या नाम जांचें',
     fertilizerOcrPrompt: 'खाद की बोरी का फोटो खींचें या सूची से चुनें',
@@ -402,6 +435,17 @@ export const translations: Record<Language, TranslationStrings> = {
     chemicalRemedyLabel: '💊 Recommended Chemical Treatment (Exact dose):',
     saveToDiary: 'Save to Farm Diary',
     savedToDiarySuccess: 'Successfully saved to Farm Diary!',
+    tabPhotoScan: '📷 Crop Photo',
+    tabSymptomDescribe: '✍️ Describe Symptoms (Voice/Text)',
+    describeSymptomsPlaceholder: 'e.g. Leaves turning yellow with curled edges, dark spots on stem, sucking pests...',
+    speakSymptomsButton: 'Speak Symptoms',
+    diagnoseButton: 'Diagnose & Get Solution',
+    directAnswerLabel: 'Direct Agricultural Solution (Direct Answer):',
+    stepByStepActionPlanLabel: 'Step-by-Step Action Plan:',
+    recommendedScanNotice: '📷 For precise confirmation, you can also upload a clear photo of the infected leaf/crop.',
+    immediateFirstAidLabel: '🚨 Immediate First-Aid & Mitigation Steps:',
+    callAgronomist: '📞 Call Agronomist (Kisan Helpline 1800-180-1551)',
+    kisanCallCenterNotice: 'Toll-free Kisan Call Center: 1800-180-1551 (6 AM - 10 PM)',
 
     fertilizerScanTitle: 'Check Fertilizer Bag or Label',
     fertilizerOcrPrompt: 'Photograph the fertilizer bag or select from list',

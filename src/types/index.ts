@@ -126,6 +126,11 @@ export interface CropAnalysisResult {
   preventionTips: string[];
   questionsForFarmer: string[];
   expertEscalationRecommended: boolean;
+  directAnswer?: string;
+  stepByStepSteps?: string[];
+  recommendedScanReason?: string | null;
+  immediateFirstAid?: string | null;
+  expertEscalationReason?: string | null;
 }
 
 export type SafetyStatus = 'SAFE' | 'NEED_MORE_INFO' | 'DO_NOT_RECOMMEND';
