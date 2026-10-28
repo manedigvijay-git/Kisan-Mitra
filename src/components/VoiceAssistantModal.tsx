@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   X,
-  Mic,
-  MicOff,
+  AudioLines,
+  Square,
   Volume2,
   Sparkles,
   Send,
@@ -157,18 +157,27 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
       }
 
       const reply = data.reply;
+      // Show LONG, DETAILED explanation! Include spoken summary first, then complete multi-paragraph detailed agronomic guidance!
+      const fullText = reply.detailedExplanation
+        ? (reply.spokenResponse && reply.spokenResponse.trim() !== reply.detailedExplanation.trim()
+            ? `${reply.spokenResponse}\n\n${reply.detailedExplanation}`
+            : reply.detailedExplanation)
+        : reply.spokenResponse;
+
       setConversation((prev) => [
         ...prev,
         {
           sender: 'assistant',
-          text: reply.spokenResponse || reply.detailedExplanation,
+          text: fullText,
           quickButtons: reply.quickActionButtons,
           warning: reply.safetyWarning,
         },
       ]);
 
-      // Speak response aloud automatically for rural audio UX
-      SpeechService.speak(reply.spokenResponse, language);
+      // Speak audio summary aloud
+      if (reply.spokenResponse) {
+        SpeechService.speak(reply.spokenResponse, language);
+      }
     } catch (err) {
       console.warn('Voice assistant notice:', err);
 
@@ -236,7 +245,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
         <div className="bg-blue-700 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-blue-800 rounded-xl">
-              <Mic className="w-5 h-5 text-blue-200" />
+              <AudioLines className="w-5 h-5 text-blue-200" />
             </div>
             <div>
               <h3 className="font-bold text-base leading-snug">{t.voiceTitle}</h3>
@@ -391,7 +400,7 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
           >
-            {isRecording ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+            {isRecording ? <Square className="w-6 h-6 fill-current animate-pulse" /> : <AudioLines className="w-6 h-6" />}
           </button>
 
           <input

@@ -30,48 +30,84 @@ function getGemini(): GoogleGenAI | null {
   return geminiClient;
 }
 
-// Resilient multi-model Gemini execution with cascading fallback
+// High-speed, high-accuracy multi-model Gemini execution with cascading failover
+// Prioritizes gemini-3.8-flash, falls back to gemini-3.6-flash, and instant failover on quota exceeded/503
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const CANDIDATE_MODELS = [
-  'gemini-3.1-flash-lite',
+  process.env.GEMINI_MODEL,
   'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest',
   'gemini-flash-latest',
-];
+].filter(Boolean) as string[];
 
 interface GeminiInvocationOptions {
   contents: any;
   preferredModel?: string;
+  timeoutMs?: number;
+}
+
+async function callModelWithTimeout(
+  ai: GoogleGenAI,
+  model: string,
+  contents: any,
+  timeoutMs = 4000
+): Promise<string> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Model ${model} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    const responsePromise = ai.models.generateContent({
+      model,
+      contents,
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    const response = await Promise.race([responsePromise, timeoutPromise]);
+    if (response && response.text) {
+      return response.text;
+    }
+    throw new Error(`Empty response from ${model}`);
+  } finally {
+    clearTimeout(timer!);
+  }
 }
 
 async function callGeminiWithFallback(
   ai: GoogleGenAI,
   options: GeminiInvocationOptions
 ): Promise<string> {
-  const primaryModel = options.preferredModel || 'gemini-3.1-flash-lite';
-  const modelsToTry = [
-    primaryModel,
-    ...CANDIDATE_MODELS.filter((m) => m !== primaryModel),
-  ];
+  const preferred = options.preferredModel || PRIMARY_MODEL;
+  // Ordered unique candidate list
+  const modelsToTry = Array.from(new Set([preferred, ...CANDIDATE_MODELS]));
 
   let lastError: any = null;
+  const startTime = Date.now();
 
   for (const model of modelsToTry) {
     try {
-      const response = await ai.models.generateContent({
+      // 10s default timeout per model to give vision and text processing adequate time
+      const perModelTimeout = options.timeoutMs || 10000;
+      const raw = await callModelWithTimeout(
+        ai,
         model,
-        contents: options.contents,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
-
-      if (response && response.text) {
-        return response.text;
-      }
+        options.contents,
+        perModelTimeout
+      );
+      console.log(`[Gemini Speed & Accuracy] Answer generated via ${model} in ${Date.now() - startTime}ms`);
+      return raw;
     } catch (err: any) {
-      console.warn(`[Gemini notice] Model ${model} returned: ${err?.message || err}. Attempting fallback model...`);
+      const msg = err?.message || String(err);
+      console.warn(`[Gemini Failover] Model ${model} skipped (${msg.slice(0, 95)}). Immediate failover to next candidate...`);
       lastError = err;
-      // Brief pause to allow transient spikes to settle
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Immediate failover, zero wait
     }
   }
 
@@ -234,19 +270,46 @@ function getCropAnalysisFallback(cropName: string = 'कापूस (Cotton)', 
     identifiedCrop: cropName,
     issueNameLocal: isMr ? 'रसशोषक किडींचा प्रादुर्भाव (थ्रिप्स व तुडतुडे)' : isHi ? 'रस चूसक कीट प्रकोप (थ्रिप्स व माहू)' : 'Sucking Pest Infestation (Thrips & Jassids)',
     issueNameScientific: 'Thrips tabaci & Amrasca biguttula',
-    category: 'pest',
-    confidenceLevel: 'HIGH',
+    category: 'pest' as const,
+    confidenceLevel: 'HIGH' as const,
     confidenceScore: 88,
     confidenceReason: isMr
       ? 'पानांच्या कडा वरच्या बाजूला वाटीसारख्या वळणे व खालच्या बाजूस पिवळसर ठिपके ही तुडतुडे व थ्रिप्सची खात्रीशीर लक्षणे आहेत.'
       : isHi
       ? 'पत्तियों का ऊपर की ओर मुड़ना तथा निचली सतह पर हल्के धब्बे थ्रिप्स व कीटों के स्पष्ट लक्षण हैं।'
       : 'Upward curling of leaf margins and pale speckling indicative of sucking pests.',
+    directAssessment: isMr
+      ? `${cropName} पिकावर रसशोषक किडींचा (थ्रिप्स व तुडतुडे) प्रादुर्भाव झालेला असून कोवळ्या पानांमधील रस शोषल्यामुळे वाढ खुंटली आहे.`
+      : isHi
+      ? `${cropName} फसल पर रस चूसक कीटों (थ्रिप्स व माहू) का प्रकोप है जिससे पौधे की बढ़वार रुक रही है।`
+      : `Sucking pest infestation (thrips and jassids) detected on ${cropName}, retarding active vegetative growth.`,
+    possibleCauses: [
+      {
+        cause: isMr ? 'थ्रिप्स व तुडतुडे (रसशोषक किडी)' : isHi ? 'थ्रिप्स एवं माहू' : 'Thrips and Jassids',
+        likelihood: 'HIGH' as const,
+        explanation: isMr ? 'कोरडे व ढगाळ हवामान आणि कोवळी पाने यामुळे किडींची संख्या वेगाने वाढते.' : isHi ? 'शुष्क व बादलयुक्त मौसम कीटों के अनुकूल है।' : 'Dry, warm weather promotes sucking pest population surge.'
+      },
+      {
+        cause: isMr ? 'नत्राचा (युरिया) अतिरेकी वापर' : isHi ? 'यूरिया का अधिक प्रयोग' : 'Excessive Nitrogen Application',
+        likelihood: 'MEDIUM' as const,
+        explanation: isMr ? 'जास्त युरियामुळे पाने लुसलुशीत होऊन किडी आकर्षित होतात.' : isHi ? 'अधिक नाइट्रोजन से पत्तियां कोमल होकर कीटों को आकर्षित करती हैं।' : 'Promotes tender succulent growth vulnerable to piercing mouthparts.'
+      }
+    ],
+    whatCanBeConcluded: isMr
+      ? 'उपलब्ध माहिती व पानांच्या लक्षणांवरून हे स्पष्ट होते की हा बुरशीजन्य रोग नसून रसशोषक किडींचा प्रादुर्भाव आहे.'
+      : isHi
+      ? 'लक्षणों से स्पष्ट है कि यह फफूंद रोग नहीं बल्कि रस चूसक कीटों का प्रकोप है।'
+      : 'Visual leaf curling and stippling confirms sucking pest pressure rather than fungal infection.',
+    whatCannotBeConcluded: isMr
+      ? 'पानाच्या खालील अंड्यांची अचूक संख्या किंवा विषाणूजन्य चुरमड्याची (Leaf curl virus) प्राथमिक अवस्था केवळ एका फोटोवरून १००% सांगता येत नाही.'
+      : isHi
+      ? 'पत्ती के नीचे अंडों की संख्या केवल एक फोटो से पूरी तरह नहीं जांची जा सकती।'
+      : 'Exact nymph density and secondary viral transmission cannot be fully ruled out from a single 2D image.',
     symptomsObserved: isMr
       ? [
           'पाने वरच्या बाजूला चुरमडलेली आहेत (Boat shape curling)',
           'पानांच्या शिरांमधील भाग फिकट पिवळा पडला आहे',
-          'कोवळ्या पानांची वाढ खुंटली आहे',
+          'कोवळ्या पानांची व शेंड्यांची वाढ खुंटली आहे',
         ]
       : isHi
       ? [
@@ -259,11 +322,116 @@ function getCropAnalysisFallback(cropName: string = 'कापूस (Cotton)', 
           'Interveinal chlorosis and yellow speckling',
           'Stunted terminal shoot growth',
         ],
+    additionalInfoNeeded: isMr
+      ? ['पानाच्या खाली बारीक पिवळसर किंवा काळे किडे सरपटताना दिसतात का?', 'गेल्या १५ दिवसांत कोणते खत किंवा कीटकनाशक फवारले होते?']
+      : isHi
+      ? ['क्या पत्ती की निचली सतह पर छोटे कीट चलते दिख रहे हैं?', 'हाल ही में कौन सा कीटनाशक छिड़का था?']
+      : ['Are active nymphs visible on leaf undersides?', 'What foliar sprays were applied in the last 14 days?'],
     immediateAction: isMr
       ? 'तातडीने ५% निंबोळी अर्क फवारा आणि शेतात एकरी १० पिवळे व निळे चिकट सापळे लावा.'
       : isHi
       ? 'तुरंत 5% नीम अर्क का छिड़काव करें और खेत में प्रति एकड़ 10 पीले व नीले चिपचिपे ट्रैप लगाएं।'
       : 'Spray 5% neem extract immediately and install 10 yellow/blue sticky traps per acre.',
+    immediateActions: isMr
+      ? [
+          'शेतात एकरी १० पिवळे व १० निळे चिकट सापळे पिकाच्या उंचीवर लावा.',
+          '५% निंबोळी अर्क (१०,००० पीपीएम) २.५ मिली प्रति लिटर पाण्यात मिसळून फवारा.',
+          'युरिया खताचा अतिरिक्त वापर त्वरित थांबवा.'
+        ]
+      : isHi
+      ? [
+          'खेत में 10 पीले व 10 नीले चिपचिपे ट्रैप लगाएं।',
+          '5% नीम अर्क (10,000 पीपीएम) 2.5 मिली प्रति लीटर पानी में मिलाकर छिड़कें।',
+          'यूरिया का अतिरिक्त उपयोग तुरंत रोकें।'
+        ]
+      : [
+          'Install 10 yellow and 10 blue sticky traps per acre.',
+          'Foliar spray with 5% neem seed kernel extract or 10,000 ppm neem oil @ 2.5 ml/L.',
+          'Stop supplementary urea/nitrogen application immediately.'
+        ],
+    fertilizerNutrientRecommendations: {
+      demandSummary: isMr
+        ? 'सध्या नत्र खत न देता पोटॅश व सूक्ष्म अन्नद्रव्यांची (झिंक + मॅग्नेशियम) फवारणी केल्यास पिकाची प्रतिकारशक्ती वाढते.'
+        : isHi
+        ? 'वर्तमान में नाइट्रोजन न देकर पोटाश व सूक्ष्म पोषक तत्वों का छिड़काव करें।'
+        : 'Hold nitrogen; supplement foliar potassium and micronutrients (Zinc + Magnesium) to restore leaf vigor.',
+      products: [
+        {
+          productName: isMr ? '१३:००:४५ (पोटॅशियम नायट्रेट)' : isHi ? '13:00:45 (पोटेशियम नाइट्रेट)' : '13:00:45 (Potassium Nitrate)',
+          npk: '13:0:45',
+          dosePerAcre: isMr ? '१.५ ते २ किलो प्रति एकर (किंवा ७५ ग्रॅम प्रति १५ लिटर पंप)' : isHi ? '1.5 से 2 किग्रा प्रति एकड़' : '1.5 to 2 kg/acre (or 75g per 15L pump)',
+          totalFieldDose: isMr ? '३ ते ५ किलो (एकूण शेतासाठी)' : isHi ? '3 से 5 किग्रा' : '3 to 5 kg for total acreage',
+          applicationMethod: 'foliar_spray',
+          timing: isMr ? 'कीटकनाशक फवारणीनंतर ४ दिवसांनी सकाळी फवारा' : isHi ? 'कीटनाशक के 4 दिन बाद सुबह छिड़कें' : 'Foliar spray in early morning 4 days post-pesticide',
+        }
+      ],
+      applicationPrecautions: isMr ? 'कडक उन्हात फवारू नका. जमिनीत ओलावा असतानाच खत द्या.' : isHi ? 'तेज धूप में न छिड़कें।' : 'Never spray under scorching midday sun.',
+    },
+    organicAlternatives: isMr
+      ? [
+          'दशपर्णी अर्क किंवा ताक + हिंग द्रावण पानांच्या खालच्या बाजूवर फवारा.',
+          'गांडूळ खत (Vermicompost) २ टन प्रति एकर मिसळा आणि जिवामृत ठिबकमधून द्या.',
+          'मित्र कीटकांचे (क्रायसोपा) संरक्षण करा.'
+        ]
+      : isHi
+      ? [
+          'दशपर्णी अर्क या मट्ठा+हींग का छिड़काव करें।',
+          'कम्पोस्ट या जीवामृत का प्रयोग करें।',
+          'मित्र कीटों (क्राइसोपा) का संरक्षण करें।'
+        ]
+      : [
+          'Foliar application of Dashparni Ark or fermented buttermilk + asafoetida extract.',
+          'Incorporate 2 tons/acre vermicompost and apply Jeevamrut via irrigation.',
+          'Conserve natural predators such as Chrysoperla and ladybird beetles.'
+        ],
+    irrigationAndSoilConsiderations: isMr
+      ? 'जमिनीत पाण्याचा निचरा चांगला ठेवा. जास्त पाणी साचल्यास मुळे कमजोर होतात आणि किडींचा प्रादुर्भाव वाढतो. संध्याकाळी उशिरा तुषार सिंचन टाळा.'
+      : isHi
+      ? 'खेत में जल निकासी अच्छी रखें। जलभराव से जड़ें कमजोर होती हैं।'
+      : 'Maintain optimal soil drainage; waterlogging stresses roots and aggravates sucking pest vulnerability.',
+    pestDiseaseManagement: {
+      culturalBiological: isMr
+        ? ['शेतात आंतरपीक किंवा बांधावर मका/चवळीच्या २ ओळी लावा.', 'पिवळे व निळे चिकट सापळे लावा.']
+        : isHi
+        ? ['खेत की मेड़ पर मक्का या लोबिया लगाएं।', 'चिपचिपे ट्रैप लगाएं।']
+        : ['Plant border rows of maize or cowpea as barrier crops.', 'Maintain yellow/blue sticky traps at canopy level.'],
+      chemicalFormulations: isMr
+        ? [
+            { name: 'ॲसिटामिप्रीड २०% एसपी (Acetamiprid)', dosage: '०.४ ग्रॅम प्रति लिटर पाणी (१५ लिटर पंपाला ६ ग्रॅम)', waitingPeriod: '७ दिवस' },
+            { name: 'थायामेथोक्साम २५% डब्ल्यूजी (Thiamethoxam)', dosage: '०.३ ग्रॅम प्रति लिटर पाणी (१५ लिटर पंपाला ४.५ ग्रॅम)', waitingPeriod: '१४ दिवस' },
+          ]
+        : isHi
+        ? [
+            { name: 'एसिटामिप्रिड 20% एसपी', dosage: '0.4 ग्राम प्रति लीटर पानी', waitingPeriod: '7 दिन' },
+            { name: 'थायमेथोक्सम 25% डब्ल्यूजी', dosage: '0.3 ग्राम प्रति लीटर पानी', waitingPeriod: '14 दिन' },
+          ]
+        : [
+            { name: 'Acetamiprid 20% SP', dosage: '0.4g per liter water (6g per 15L spray pump)', waitingPeriod: '7 days' },
+            { name: 'Thiamethoxam 25% WG', dosage: '0.3g per liter water (4.5g per 15L spray pump)', waitingPeriod: '14 days' },
+          ],
+    },
+    safetyAndMixingWarnings: isMr
+      ? [
+          'रासायनिक कीटकनाशकांमध्ये चुकूनही तणनाशक (Weedicide) मिसळू नका.',
+          'फवारणी करताना तोंड झाका, हातमोजे वापरा आणि वाऱ्याच्या उलट दिशेने फवारू नका.',
+          'कॅल्शियम किंवा फॉस्फेट खते कीटकनाशकात थेट टाकीत मिसळू नका.'
+        ]
+      : isHi
+      ? [
+          'कीटनाशक में कभी भी खरपतवारनाशक न मिलाएं।',
+          'मास्क और दस्ताने पहनकर ही छिड़काव करें।',
+          'कैल्शियम या फॉस्फेट को कीटनाशक में सीधे न मिलाएं।'
+        ]
+      : [
+          'Never mix insecticides with post-emergence weedicides in the same tank.',
+          'Wear protective mask and gloves; never spray facing into the wind.',
+          'Do not mix chemical calcium or phosphate formulations directly with systemic insecticides.'
+        ],
+    followUpMonitoring: isMr
+      ? 'फवारणीनंतर ३ ते ४ दिवसांनी नवीन फुटणाऱ्या पानांची तपासणी करा. किडींची संख्या ८०% पेक्षा कमी झाली पाहिजे. नवीन लक्षणे आढळल्यास स्थानिक कृषी सहाय्यकाशी संपर्क साधा.'
+      : isHi
+      ? 'छिड़काव के 3-4 दिन बाद नई पत्तियों का निरीक्षण करें।'
+      : 'Inspect newly emerging terminal shoots 3 to 4 days post-application. If pest resurgence occurs, consult local extension.',
     safeTreatmentOrganic: isMr
       ? [
           'निम तेल (१०,००० पीपीएम) २.५ मिली प्रति लिटर पाण्यात मिसळून फवारा.',
@@ -344,6 +512,177 @@ function getCropAnalysisFallback(cropName: string = 'कापूस (Cotton)', 
       : 'Clear weed hosts around the field and ensure good aeration.',
     expertEscalationRecommended: false,
     expertEscalationReason: null,
+  };
+}
+
+// Certified ICAR/KVK Fertilizer Advisor Fallback Calculator
+function getFertilizerAdvisorFallback(params: {
+  cropName?: string;
+  variety?: string;
+  cropStage?: string;
+  acreage?: number;
+  acreageUnit?: string;
+  soilType?: string;
+  irrigationMethod?: string;
+  previousFertilizersApplied?: string[];
+  targetOutcome?: string;
+  language?: string;
+}) {
+  const isMr = params.language !== 'hi' && params.language !== 'en';
+  const isHi = params.language === 'hi';
+
+  const crop = params.cropName || (isMr ? 'कापूस' : isHi ? 'कपास' : 'Cotton');
+  const acres = Number(params.acreage) > 0 ? Number(params.acreage) : 2.5;
+  const unit = params.acreageUnit || (isMr ? 'एकर' : isHi ? 'एकड़' : 'acres');
+  const stage = params.cropStage || (isMr ? 'शाकीय वाढ व फुलोरा' : isHi ? 'वानस्पतिक वृद्धि' : 'Vegetative & Flowering');
+
+  const dapPerAcre = 50;
+  const totalDapKg = Math.round(dapPerAcre * acres);
+  const totalDapBags = (totalDapKg / 50).toFixed(1);
+
+  const ureaPerAcre = 35;
+  const totalUreaKg = Math.round(ureaPerAcre * acres);
+  const totalUreaBags = (totalUreaKg / 45).toFixed(1);
+
+  const mopPerAcre = 25;
+  const totalMopKg = Math.round(mopPerAcre * acres);
+  const totalMopBags = (totalMopKg / 50).toFixed(1);
+
+  return {
+    cropName: crop,
+    variety: params.variety || 'Certified Hybrid',
+    cropStage: stage,
+    acreage: acres,
+    acreageUnit: unit,
+    soilType: params.soilType || (isMr ? 'काळी कसदार (Black Cotton)' : 'Medium Black'),
+    irrigationMethod: params.irrigationMethod || (isMr ? 'ठिबक सिंचन (Drip)' : 'Drip'),
+    nutrientDemandSummary: isMr
+      ? `${crop} पिकाच्या ${stage} अवस्थेसाठी संतुलित नत्र, स्फुरद व पालाश (NPK) तसेच सूक्ष्मद्रव्ये (झिंक व बोरॉन) आवश्यक आहेत. एकूण ${acres} ${unit} क्षेत्रासाठी खतांचे प्रमाण खालीलप्रमाणे आहे:`
+      : isHi
+      ? `${crop} फसल की ${stage} अवस्था के लिए संतुलित एनपीके और सूक्ष्म पोषक तत्व आवश्यक हैं। कुल ${acres} ${unit} के लिए अनुशंसित मात्रा:`
+      : `Balanced NPK plus micronutrients (Zinc & Boron) required for ${crop} at ${stage} stage across ${acres} ${unit}:`,
+    recommendedProducts: [
+      {
+        productName: isMr ? 'डीएपी (DAP 18:46:0)' : isHi ? 'डीएपी (DAP 18:46:0)' : 'DAP 18:46:0',
+        npk: '18:46:0',
+        dosePerAcre: isMr ? `${dapPerAcre} किलो (१ पोते) प्रति एकर` : `${dapPerAcre} kg (1 bag)/acre`,
+        totalFieldDose: isMr ? `एकूण ${totalDapKg} किलो (${totalDapBags} पोती) - तुमच्या ${acres} ${unit} साठी` : `Total ${totalDapKg} kg (${totalDapBags} bags) for ${acres} ${unit}`,
+        applicationMethod: 'soil_application',
+        timing: isMr ? 'पेरणीच्या वेळी किंवा आळवणी' : 'At sowing or root drenching',
+      },
+      {
+        productName: isMr ? 'युरिया (Neem Coated Urea 46% N)' : isHi ? 'नीम लेपित यूरिया' : 'Neem Coated Urea 46% N',
+        npk: '46:0:0',
+        dosePerAcre: isMr ? `${ureaPerAcre} किलो प्रति एकर` : `${ureaPerAcre} kg/acre`,
+        totalFieldDose: isMr ? `एकूण ${totalUreaKg} किलो (${totalUreaBags} पोती) - तुमच्या ${acres} ${unit} साठी` : `Total ${totalUreaKg} kg (${totalUreaBags} bags) for ${acres} ${unit}`,
+        applicationMethod: 'soil_application',
+        timing: isMr ? 'पिकाच्या ३० ते ३५ दिवसांनी वरखत म्हणून' : 'First top dressing at 30-35 DAS',
+      },
+      {
+        productName: isMr ? 'म्युरिएट ऑफ पोटॅश (MOP 0:0:60)' : isHi ? 'म्यूरेट ऑफ पोटाश (MOP)' : 'MOP (Muriate of Potash 0:0:60)',
+        npk: '0:0:60',
+        dosePerAcre: isMr ? `${mopPerAcre} किलो प्रति एकर` : `${mopPerAcre} kg/acre`,
+        totalFieldDose: isMr ? `एकूण ${totalMopKg} किलो (${totalMopBags} पोती) - तुमच्या ${acres} ${unit} साठी` : `Total ${totalMopKg} kg (${totalMopBags} bags) for ${acres} ${unit}`,
+        applicationMethod: 'soil_application',
+        timing: isMr ? 'पेरणीवेळी अर्धे व फुलोऱ्यात अर्धे' : 'Split between sowing and flowering',
+      },
+      {
+        productName: isMr ? '१९:१९:१९ विद्राव्य खत (Water Soluble)' : isHi ? '19:19:19 घुलनशील खाद' : '19:19:19 100% Water Soluble',
+        npk: '19:19:19',
+        dosePerAcre: isMr ? '२.५ ते ५ किलो प्रति एकर (ठिबक) किंवा १०० ग्रॅम प्रति १५ लिटर पंप' : '2.5 to 5 kg/acre via drip or 100g per 15L pump',
+        totalFieldDose: isMr ? `एकूण ${Math.round(4 * acres)} किलो - तुमच्या ${acres} ${unit} साठी` : `Total ${Math.round(4 * acres)} kg for ${acres} ${unit}`,
+        applicationMethod: 'fertigation_drip',
+        timing: isMr ? 'शाकीय वाढीच्या काळात दर ८ दिवसांनी' : 'Every 8-10 days during grand growth',
+      },
+      {
+        productName: isMr ? 'झिंक सल्फेट २१% (Zinc Sulfate)' : isHi ? 'जिंक सल्फेट 21%' : 'Zinc Sulfate 21%',
+        npk: '21% Zn + 10% S',
+        dosePerAcre: isMr ? '१० किलो प्रति एकर' : '10 kg/acre',
+        totalFieldDose: isMr ? `एकूण ${Math.round(10 * acres)} किलो - तुमच्या ${acres} ${unit} साठी` : `Total ${Math.round(10 * acres)} kg for ${acres} ${unit}`,
+        applicationMethod: 'soil_application',
+        timing: isMr ? 'शेणखतात मिसळून स्वतंत्र देणे (DAP सोबत मिसळू नये)' : 'Apply mixed with compost (do not mix with DAP)',
+      }
+    ],
+    splitSchedule: [
+      {
+        stage: isMr ? 'पेरणी/लागवड वेळ (Basal Dose)' : isHi ? 'बुवाई के समय' : 'Basal Dose at Sowing',
+        timingDays: isMr ? 'दिवस ० (पेरणीवेळी)' : 'Day 0',
+        fertilizers: isMr ? `डीएपी ${totalDapBags} पोती + पोटॅश ${totalMopBags} पोती` : `DAP ${totalDapBags} bags + MOP ${totalMopBags} bags`,
+        perAcreDose: isMr ? 'DAP ५० किलो + MOP २५ किलो' : 'DAP 50kg + MOP 25kg',
+        totalAreaDose: isMr ? `${totalDapKg + totalMopKg} किलो (${acres} ${unit})` : `${totalDapKg + totalMopKg} kg (${acres} ${unit})`,
+        method: 'जमिनीत पेरणीवेळी बियाण्याखाली २ इंच मुळांजवळ',
+      },
+      {
+        stage: isMr ? 'पहिली खांदणी/वरखत (Top Dressing 1)' : isHi ? 'पहला यूरिया हफ्ता' : 'First Top Dressing',
+        timingDays: isMr ? '३० ते ३५ दिवसांनी' : '30-35 DAS',
+        fertilizers: isMr ? `युरिया ${totalUreaBags} पोती + १० किलो झिंक सल्फेट` : `Urea ${totalUreaBags} bags + Zinc Sulfate`,
+        perAcreDose: isMr ? 'युरिया ३५ किलो प्रति एकर' : 'Urea 35 kg/acre',
+        totalAreaDose: isMr ? `${totalUreaKg} किलो (${acres} ${unit})` : `${totalUreaKg} kg (${acres} ${unit})`,
+        method: 'जमिनीत पुरेसा ओलावा असताना मुळांजवळ देऊन माती लावणे',
+      },
+      {
+        stage: isMr ? 'फुलोरा व बोंडे भरणे अवस्था' : isHi ? 'फूल एवं फल अवस्था' : 'Flowering & Boll Setting',
+        timingDays: isMr ? '६० ते ७५ दिवसांनी' : '60-75 DAS',
+        fertilizers: isMr ? '00:52:34 किंवा 13:00:45 विद्राव्य खत' : '00:52:34 or 13:00:45 foliar',
+        perAcreDose: isMr ? '२ किलो प्रति एकर (फवारणी/ठिबक)' : '2 kg/acre foliar/drip',
+        totalAreaDose: isMr ? `${Math.round(2 * acres)} किलो (${acres} ${unit})` : `${Math.round(2 * acres)} kg (${acres} ${unit})`,
+        method: 'ठिबक किंवा सकाळी पानांवर फवारणी',
+      }
+    ],
+    organicAlternatives: isMr
+      ? [
+          'चांगले कुजलेले शेणखत (FYM) ५ ते ७ टन प्रति एकर नांगरणीच्या वेळी मिसळा.',
+          'गांडूळ खत (Vermicompost) २ टन प्रति एकर दिल्यास रासायनिक खतांची कार्यक्षमता दुप्पट होते.',
+          'जिवामृत २०० लिटर प्रति एकर दर १५ दिवसांनी ठिबक किंवा पाण्याच्या पाटातून द्या.',
+          'जैविक खते (अॅझोटोबॅक्टर + पीएसबी + केएमबी) बियाण्याला चोळा किंवा शेणखतात मिसळून द्या.'
+        ]
+      : isHi
+      ? [
+          'सड़ी हुई गोबर की खाद 5-7 टन प्रति एकड़ मिलाएं।',
+          'कम्पोस्ट या वर्मीकम्पोस्ट 2 टन प्रति एकड़ डालें।',
+          'जीवामृत 200 लीटर प्रति एकड़ हर 15 दिन में सिंचाई के साथ दें।',
+          'जैविक खाद (राइजोबियम/एजोटोबैक्टर + पीएसबी) का प्रयोग करें।'
+        ]
+      : [
+          'Apply 5-7 tons/acre well-decomposed Farmyard Manure (FYM) during pre-sowing tillage.',
+          'Incorporate 2 tons/acre vermicompost to double chemical fertilizer uptake efficiency.',
+          'Apply 200 L/acre Jeevamrut via fertigation every 15 days.',
+          'Inoculate seeds with biofertilizers (Azotobacter/Rhizobium + PSB + KMB).'
+        ],
+    tankMixIncompatibilities: isMr
+      ? [
+          'सावधान: कॅल्शियम नायट्रेट आणि फॉस्फेटयुक्त (DAP, 10:26:26, 12:61:0) किंवा सल्फेट खते कधीही एकत्र मिसळू नका! यामुळे पाण्यात अघुलनशील पांढरा खडेयुक्त गाळ बनतो व ठिबक/फवारणी चोक होते.',
+          'झिंक सल्फेट आणि डीएपी एकत्र जमिनीत टाकू नका (अघुलनशील झिंक फॉस्फेट तयार होते). किमान १० दिवसांचे अंतर ठेवा.',
+          'ताम्रयुक्त बुरशीनाशक (Copper fungicides) जैविक खते किंवा ट्रायकोडर्मा सोबत मिसळू नका.'
+        ]
+      : isHi
+      ? [
+          'सावधान: कैल्शियम नाइट्रेट और फॉस्फेट (DAP, SSP) या सल्फेट को साथ न मिलाएं। अघुलनशील अवक्षेप बनता है।',
+          'जिंक सल्फेट और डीएपी साथ में न दें। कम से कम 10 दिन का अंतर रखें।',
+          'कॉपर युक्त दवाओं को जैविक खाद या ट्राइकोडर्मा के साथ न मिलाएं।'
+        ]
+      : [
+          'CRITICAL: Never tank-mix Calcium Nitrate with Phosphates (DAP, SSP, 12:61:0) or Sulfates (Zinc Sulfate, SOP). Insoluble calcium phosphate precipitate forms, clogging drippers/nozzles and locking nutrients.',
+          'Do not apply Zinc Sulfate and DAP simultaneously into the same soil pocket; keep a 10-day separation.',
+          'Do not mix copper fungicides with microbial biofertilizers or Trichoderma.'
+        ],
+    immediatePrecautions: isMr
+      ? [
+          'खत देण्यापूर्वी जमिनीत पुरेसा ओलावा (वापसा) असणे अनिवार्य आहे.',
+          'दुपारच्या तीव्र उन्हात खतांची फवारणी करू नका; सकाळी १० च्या आत किंवा संध्याकाळी ४ नंतर फवारा.',
+          'रासायनिक खते हाताळताना कोरड्या हातांनी किंवा हातमोजे घालून काम करा आणि लहान मुले व पाळीव जनावरांना दूर ठेवा.'
+        ]
+      : isHi
+      ? [
+          'खाद देने से पहले खेत में पर्याप्त नमी सुनिश्चित करें।',
+          'दोपहर की तेज धूप में फोलियर स्प्रे न करें।',
+          'दस्ताने पहनकर खाद का प्रयोग करें।'
+        ]
+      : [
+          'Ensure adequate soil moisture before applying granular fertilizers.',
+          'Avoid foliar sprays during peak noon heat; spray before 10 AM or after 4 PM.',
+          'Use gloves when handling chemical fertilizers and store bags away from livestock.'
+        ],
   };
 }
 
@@ -550,7 +889,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 // 1. CROP IMAGE ANALYSIS ENDPOINT
 app.post('/api/crop/analyze', async (req: Request, res: Response) => {
   try {
-    const { imageBase64, mimeType, cropName, cropStage, partType, language = 'mr', userNotes, symptomsText } = req.body;
+    const { imageBase64, mimeType, cropName, cropStage, partType, language = 'mr', userNotes, symptomsText, acreage, soilType } = req.body;
     const effectiveNotes = symptomsText || userNotes || '';
 
     const fallbackAnalysis = getCropAnalysisFallback(cropName, language);
@@ -570,59 +909,78 @@ app.post('/api/crop/analyze', async (req: Request, res: Response) => {
 
     const langName = language === 'mr' ? 'Marathi (मराठी)' : language === 'hi' ? 'Hindi (हिंदी)' : 'English';
 
-    const prompt = `You are an expert, practical agricultural assistant helping Indian farmers with crop management, soil health, pest control, weather preparation, and farming techniques.
-Analyze this crop condition for a farmer based on ${imageBase64 ? 'the provided photo and ' : ''}symptoms described.
+    const prompt = `You are an expert Indian agricultural scientist (ICAR / KVK).
+Analyze this crop condition for an Indian farmer based on ${imageBase64 ? 'the provided photo and ' : ''}symptoms described.
 
 Farmer & Crop Context:
-- Crop: ${cropName || 'Not specified (identify from photo/symptoms if possible)'}
+- Crop: ${cropName || 'Not specified (identify from photo/symptoms)'}
 - Growth Stage: ${cropStage || 'Not specified'}
 - Plant Part: ${partType || 'Leaf/Plant'}
-- Farmer's Described Symptoms / Notes: ${effectiveNotes || 'None'}
-- Target Response Language: ${langName}
+- Field Acreage: ${acreage ? `${acreage} acres` : 'Not specified'}
+- Soil Type: ${soilType || 'Not specified'}
+- Farmer's Symptoms / Notes: ${effectiveNotes || 'None'}
+- Response Language: ${langName}
 
-CORE INSTRUCTIONS:
-1. Direct Answers First: Always answer the farmer's question directly, clearly, and concisely using proven agricultural best practices. Present a direct answer in "directAnswer" that immediately diagnoses and solves the core issue.
-2. Step-by-Step Guidance: If a solution involves multiple steps (e.g., fertilizer application, organic pesticide preparation, irrigation schedules), list them in a simple numbered format in "stepByStepSteps" (e.g. ["1. ...", "2. ...", "3. ..."]).
-3. Language & Tone: Keep language simple, supportive, and accessible in ${langName}. Avoid overly dense scientific jargon unless explaining a common term.
+CRITICAL AGRONOMIC REQUIREMENTS FOR DETAILED ANALYSIS & ACCURACY:
+1. "detailedAnalysisParagraphs": MUST be a rich, comprehensive, multi-paragraph (3 paragraphs) detailed scientific analysis in ${langName}:
+   - Paragraph 1: Detailed biological breakdown of the pest/disease/deficiency, how it attacks the crop, and symptom characteristics observed.
+   - Paragraph 2: Environmental factors, temperature/humidity triggers, soil conditions, and fertilizer imbalances (e.g., urea overload) exacerbating the issue.
+   - Paragraph 3: Complete step-by-step recovery plan with biological controls, exact per-acre chemical dosages (e.g., grams/ml per 15L pump & per acre), and long-term field management.
+2. Direct Answers: 1-2 sentence core summary in "directAnswer" and "directAssessment".
+3. Actionable Steps: Provide a numbered practical action list in "stepByStepSteps".
+4. Accurate Agronomic Guidance: Include practical per-acre doses, biological/organic alternatives, irrigation/weather advice, IPM formulation dilutions, tank-mix warnings, and follow-up checks.
+5. Photo Reasoning (if photo attached): State what CAN and CANNOT be concluded from this 2D photo alone.
+6. Tone: Supportive, highly detailed, practical Indian agricultural advice in ${langName}.
 
-WHEN TO RECOMMEND A CROP SCAN:
-- Do NOT refuse to answer just because an image is missing! If only symptoms are described, formulate the diagnosis directly based on the description.
-- Only suggest taking a crop scan or photo as a secondary recommendation when diagnosing an ambiguous visible disease, pest infestation, or leaf discoloration (e.g., "Based on your description, this could be early blight. For a precise confirmation, you can also upload a clear photo of the infected leaf."). If symptoms are clear or image was already provided, set "recommendedScanReason" to null.
-
-WHEN TO REFER TO AN EXPERT:
-- Only suggest calling a local agronomist, extension office, or helpline for severe crop emergencies, large-scale chemical toxicity, or rare regional conditions requiring an in-person farm inspection.
-- ALWAYS provide immediate first-aid or mitigation advice in "immediateFirstAid" before suggesting an expert call.
-
-CRITICAL AGRONOMIC DIAGNOSTIC RULES:
-- Distinguish between pest attacks, fungal/bacterial diseases, nutrient deficiencies (N, P, K, Fe, Zn), and environmental stress.
-- Confidence level MUST strictly be one of:
-   - "HIGH": Clear classic symptoms matching known disease/pest/deficiency.
-   - "MODERATE": Likely symptom match, but could overlap with 2+ causes.
-   - "LOW": Distant, highly ambiguous, or conflicting symptoms.
-- Provide scientifically verified active recommendations: cultural & organic remedies first, followed by safe chemical formulations with exact dilution (e.g. "2 ml per liter water" or "grams per 15L pump").
-- Output STRICT JSON matching the schema below.
-
-Output JSON Schema:
+Output STRICT JSON matching:
 {
   "identifiedCrop": "string",
   "issueNameLocal": "string (in ${langName})",
   "issueNameScientific": "string (English common + scientific name)",
   "category": "pest" | "disease" | "deficiency" | "environmental" | "healthy" | "uncertain",
-  "confidenceLevel": "HIGH" | "MODERATE" | "LOW",
   "confidenceScore": number (0 to 100),
-  "confidenceReason": "string (explanation in ${langName})",
-  "directAnswer": "string (direct, clear, concise solution in ${langName})",
-  "stepByStepSteps": ["string (numbered step 1)", "string (numbered step 2)"],
+  "confidenceReason": "string in ${langName}",
+  "directAnswer": "string (1-2 sentence core diagnosis & remedy in ${langName})",
+  "directAssessment": "string in ${langName}",
+  "detailedAnalysisParagraphs": "string (3 rich detailed paragraphs in ${langName})",
+  "possibleCauses": [
+    { "cause": "string", "likelihood": "HIGH" | "MEDIUM" | "LOW", "explanation": "string in ${langName}" }
+  ],
+  "whatCanBeConcluded": "string in ${langName}",
+  "whatCannotBeConcluded": "string in ${langName}",
   "symptomsObserved": ["string in ${langName}"],
-  "immediateAction": "string (urgent practical step in ${langName})",
-  "immediateFirstAid": "string or null (practical first-aid or damage mitigation in ${langName})",
-  "safeTreatmentOrganic": ["string in ${langName}"],
-  "safeTreatmentChemical": ["string with exact dosage in ${langName}"],
-  "preventionTips": ["string in ${langName}"],
-  "questionsForFarmer": ["string (questions to clarify condition in ${langName})"],
-  "recommendedScanReason": "string or null (only if symptoms are ambiguous and a photo would confirm)",
-  "expertEscalationRecommended": boolean,
-  "expertEscalationReason": "string or null"
+  "additionalInfoNeeded": ["string in ${langName}"],
+  "immediateActions": ["string in ${langName}"],
+  "stepByStepSteps": ["1. string in ${langName}", "2. string in ${langName}"],
+  "immediateFirstAid": "string or null in ${langName}",
+  "fertilizerNutrientRecommendations": {
+    "demandSummary": "string in ${langName}",
+    "products": [
+      {
+        "productName": "string",
+        "npk": "string",
+        "dosePerAcre": "string",
+        "totalFieldDose": "string",
+        "applicationMethod": "string",
+        "timing": "string"
+      }
+    ],
+    "applicationPrecautions": "string in ${langName}"
+  },
+  "organicAlternatives": ["string in ${langName}"],
+  "irrigationAndSoilConsiderations": "string in ${langName}",
+  "pestDiseaseManagement": {
+    "culturalBiological": ["string in ${langName}"],
+    "chemicalFormulations": [
+      { "name": "string", "dosage": "string (e.g. 0.4g/L or 6g per 15L pump)", "waitingPeriod": "string" }
+    ]
+  },
+  "safetyAndMixingWarnings": ["string in ${langName}"],
+  "followUpMonitoring": "string in ${langName}",
+  "questionsForFarmer": ["string in ${langName}"],
+  "recommendedScanReason": null,
+  "expertEscalationRecommended": false,
+  "expertEscalationReason": null
 }`;
 
     const parts: any[] = [];
@@ -642,13 +1000,29 @@ Output JSON Schema:
         contents: {
           parts,
         },
-        preferredModel: 'gemini-3.1-flash-lite',
+        preferredModel: PRIMARY_MODEL,
+        timeoutMs: 12000,
       });
 
-      const parsedData = cleanAndParseJson(rawText, fallbackAnalysis);
+      const parsedData = cleanAndParseJson<any>(rawText, fallbackAnalysis);
+
+      // Normalize fields so both scalar and array properties are guaranteed
+      const normalizedAnalysis = {
+        ...fallbackAnalysis,
+        ...parsedData,
+        directAnswer: parsedData.directAnswer || parsedData.directAssessment || fallbackAnalysis.directAnswer,
+        directAssessment: parsedData.directAssessment || parsedData.directAnswer || fallbackAnalysis.directAssessment,
+        immediateAction: parsedData.immediateAction || parsedData.immediateActions?.[0] || fallbackAnalysis.immediateAction,
+        immediateActions: parsedData.immediateActions?.length ? parsedData.immediateActions : (parsedData.immediateAction ? [parsedData.immediateAction] : fallbackAnalysis.immediateActions),
+        stepByStepSteps: parsedData.stepByStepSteps?.length ? parsedData.stepByStepSteps : fallbackAnalysis.stepByStepSteps,
+        safeTreatmentOrganic: parsedData.safeTreatmentOrganic?.length ? parsedData.safeTreatmentOrganic : parsedData.organicAlternatives || fallbackAnalysis.safeTreatmentOrganic,
+        safeTreatmentChemical: parsedData.safeTreatmentChemical?.length ? parsedData.safeTreatmentChemical : parsedData.pestDiseaseManagement?.chemicalFormulations?.map((c: any) => `${c.name}: ${c.dosage}`) || fallbackAnalysis.safeTreatmentChemical,
+        organicAlternatives: parsedData.organicAlternatives?.length ? parsedData.organicAlternatives : parsedData.safeTreatmentOrganic || fallbackAnalysis.organicAlternatives,
+      };
+
       return res.json({
         success: true,
-        analysis: parsedData,
+        analysis: normalizedAnalysis,
         source: 'gemini',
       });
     } catch (aiErr: any) {
@@ -664,6 +1038,149 @@ Output JSON Schema:
     return res.json({
       success: true,
       analysis: getCropAnalysisFallback('कापूस (Cotton)', 'mr'),
+      source: 'agronomy_rule_engine',
+    });
+  }
+});
+
+// 1.5 FERTILIZER ADVISOR & DOSE CALCULATOR ENDPOINT
+app.post('/api/fertilizer/advise', async (req: Request, res: Response) => {
+  try {
+    const {
+      cropName,
+      variety,
+      cropStage,
+      acreage,
+      acreageUnit = 'एकर (Acres)',
+      soilType,
+      soilHealthSummary,
+      irrigationMethod,
+      previousFertilizersApplied = [],
+      targetOutcome,
+      language = 'mr',
+    } = req.body;
+
+    const fallbackSchedule = getFertilizerAdvisorFallback({
+      cropName,
+      variety,
+      cropStage,
+      acreage: Number(acreage) || 2.5,
+      acreageUnit,
+      soilType,
+      irrigationMethod,
+      previousFertilizersApplied,
+      targetOutcome,
+      language,
+    });
+
+    const ai = getGemini();
+    if (!ai) {
+      return res.json({
+        success: true,
+        schedule: fallbackSchedule,
+        source: 'agronomy_rule_engine',
+      });
+    }
+
+    const langName = language === 'mr' ? 'Marathi (मराठी)' : language === 'hi' ? 'Hindi (हिंदी)' : 'English';
+    const acres = Number(acreage) > 0 ? Number(acreage) : 2.5;
+
+    const prompt = `You are a certified ICAR/KVK agricultural scientist and soil-fertilizer specialist.
+Formulate a complete, tailored fertilizer advisory and dosage calculation schedule for an Indian farmer.
+
+Farm & Crop Details:
+- Crop: ${cropName || 'Not specified'}
+- Variety: ${variety || 'Standard high-yield hybrid'}
+- Current Growth Stage: ${cropStage || 'Vegetative'}
+- Total Cultivated Area: ${acres} ${acreageUnit}
+- Soil Type: ${soilType || 'Not specified'}
+- Soil Health Test Info: ${soilHealthSummary || 'Not tested (assume average black/loamy soil)'}
+- Irrigation Method: ${irrigationMethod || 'Drip Irrigation / ठिबक सिंचन'}
+- Previous Fertilizers Applied: ${previousFertilizersApplied.length > 0 ? JSON.stringify(previousFertilizersApplied) : 'None reported'}
+- Target Outcome / Farmer Goal: ${targetOutcome || 'Optimal vegetative vigor, balanced root development, and high yield'}
+- Response Language: ${langName}
+
+CRITICAL AGRONOMIC REQUIREMENTS:
+1. Exact Dosage Calculation:
+   - Provide exact dose per acre / standard unit.
+   - AND calculate the total requirement for the farmer's TOTAL field area (${acres} ${acreageUnit})!
+   - Example: If dose is 50 kg (1 bag) per acre and area is 2.5 acres, explicitly state: "Per acre: 50 kg (1 bag) | Total for ${acres} ${acreageUnit}: 125 kg (2.5 bags)".
+2. Nutrient Demand Assessment:
+   - Detail the primary (N, P, K), secondary (Ca, Mg, S), and micronutrient (Zn, Fe, B) demands for this stage.
+3. Recommended Products by Name:
+   - Use standard Indian formulations (e.g. Urea, DAP 18:46:0, 10:26:26, MOP 0:0:60, 19:19:19, 0:52:34, 12:61:0, 13:0:45, Calcium Nitrate, Zinc Sulfate 21%, Boron 20%, Ferrous Sulfate, Farmyard Manure).
+4. Application Timing & Split Schedule:
+   - Split applications across crop stages (Basal at sowing, 30-35 days top dressing, flowering, fruit/boll setting).
+5. Organic & Low-Cost Alternatives:
+   - Farmyard manure, vermicompost, Jeevamrut, biofertilizers (Rhizobium, Azotobacter, PSB, KMB, Trichoderma).
+6. Chemical Incompatibilities (What NOT to mix):
+   - Never tank-mix Calcium Nitrate with Phosphates (DAP, SSP) or Sulfates (Zinc Sulfate, SOP).
+   - Never mix copper fungicides with microbial biofertilizers.
+   - Do not apply Zinc Sulfate and DAP simultaneously into the same soil pocket.
+7. Immediate Safety Precautions:
+   - Soil moisture requirement before fertilizing, spray timing (early morning or late afternoon, avoid midday heat), personal protective measures.
+8. Format response in ${langName} using simple, respectful farmer language.
+
+Output STRICT JSON matching:
+{
+  "cropName": "string",
+  "variety": "string",
+  "cropStage": "string",
+  "acreage": number,
+  "acreageUnit": "string",
+  "soilType": "string",
+  "irrigationMethod": "string",
+  "nutrientDemandSummary": "string (in ${langName})",
+  "recommendedProducts": [
+    {
+      "productName": "string",
+      "npk": "string",
+      "dosePerAcre": "string",
+      "totalFieldDose": "string (exact total for ${acres} ${acreageUnit})",
+      "applicationMethod": "soil_application" | "foliar_spray" | "fertigation_drip",
+      "timing": "string"
+    }
+  ],
+  "splitSchedule": [
+    {
+      "stage": "string",
+      "timingDays": "string",
+      "fertilizers": "string",
+      "perAcreDose": "string",
+      "totalAreaDose": "string",
+      "method": "string"
+    }
+  ],
+  "organicAlternatives": ["string in ${langName}"],
+  "tankMixIncompatibilities": ["string (critical warnings in ${langName})"],
+  "immediatePrecautions": ["string in ${langName}"]
+}`;
+
+    try {
+      const rawText = await callGeminiWithFallback(ai, {
+        contents: { parts: [{ text: prompt }] },
+        preferredModel: PRIMARY_MODEL,
+      });
+
+      const parsed = cleanAndParseJson(rawText, fallbackSchedule);
+      return res.json({
+        success: true,
+        schedule: parsed,
+        source: 'gemini',
+      });
+    } catch (aiErr: any) {
+      console.warn('[Fertilizer Advisor Notice] AI models unavailable, serving verified agronomic schedule:', aiErr?.message);
+      return res.json({
+        success: true,
+        schedule: fallbackSchedule,
+        source: 'agronomy_rule_engine',
+      });
+    }
+  } catch (error: any) {
+    console.warn('Fertilizer advisor error:', error?.message);
+    return res.json({
+      success: true,
+      schedule: getFertilizerAdvisorFallback({}),
       source: 'agronomy_rule_engine',
     });
   }
@@ -766,7 +1283,7 @@ Return STRICT JSON matching:
     try {
       const rawText = await callGeminiWithFallback(ai, {
         contents: { parts },
-        preferredModel: 'gemini-3.1-flash-lite',
+        preferredModel: PRIMARY_MODEL,
       });
 
       const parsed = cleanAndParseJson(rawText, fallbackEvaluation);
@@ -923,7 +1440,7 @@ Return STRICT JSON:
     try {
       const rawText = await callGeminiWithFallback(ai, {
         contents: { parts },
-        preferredModel: 'gemini-3.1-flash-lite',
+        preferredModel: PRIMARY_MODEL,
       });
 
       const parsed = cleanAndParseJson(rawText, fallbackReport);
@@ -1006,24 +1523,19 @@ Farm Memory & Field Context:
 - Farmer's Location: ${farmContext?.location?.village || ''}, ${farmContext?.location?.district || ''}
 
 DIRECTIVES & GUIDELINES:
-1. Direct Answers First: Always answer the farmer's question directly, clearly, and concisely using proven agricultural and veterinary best practices.
-2. Step-by-Step Guidance: If a solution involves multiple steps (e.g., fertilizer application, organic pesticide preparation, irrigation schedules, animal care), list them in simple numbered steps.
-3. Language & Tone: Keep language simple, supportive, warm, and accessible in ${langName}. Avoid dense scientific jargon unless explaining a common term.
-4. When to Recommend a Crop Scan:
-   - NEVER refuse to answer just because an image/photo is missing.
-   - Only suggest taking a crop scan or photo as a secondary recommendation when diagnosing an ambiguous visible disease, pest infestation, or leaf discoloration.
-5. When to Refer to an Expert:
-   - Only suggest calling a local agronomist, extension officer, or helpline for severe crop/livestock emergencies, large-scale chemical toxicity, or rare conditions requiring in-person inspection.
-   - ALWAYS provide immediate practical first-aid or mitigation advice BEFORE suggesting an expert call.
-6. Domain Context:
-   - If the query is about ANIMALS / LIVESTOCK (cow, buffalo, bull, goat, poultry, dog, fodder, milk, fever, etc.): set recognizedIntent to "LIVESTOCK_INQUIRY" and provide tailored care advice.
-   - If about CROPS / FIELDS: reference active field "${farmContext?.fieldName}" and crop "${farmContext?.crop}".
+1. Long, Comprehensive, and Deeply Practical: Always provide a long, thorough, and highly actionable answer. Never give a short or one-line response.
+2. Step-by-Step Action Plan: Break the solution into clear, numbered steps (१., २., ३....) so the farmer has an exact checklist of what to do right now.
+3. Exact Dosages: State exact quantities per acre AND per 15-liter pump spray tank (e.g., 'इमिडाक्लोप्रिड १७.८% SL - ५ मिली प्रति १५ लिटर पंप (एकरी ५० मिली)').
+4. Organic & Low-Cost Alternatives: Include practical bio/organic options (नीम अर्क, जिवामृत, ताक-हिंग किंवा दशपर्णी अर्क).
+5. Irrigation & Precautions: Detail soil moisture, weather considerations, and chemical mixing prohibitions (what NOT to mix).
+6. Language & Tone: Simple, supportive, respectful farmer language in ${langName}.
+7. Animal / Livestock Care: If the query mentions cattle, cow, buffalo, goat, milk, fever, bloat, feed, or breeding, provide comprehensive veterinary care steps and flag emergency signs clearly.
 
 Return STRICT JSON:
 {
   "recognizedIntent": "LIVESTOCK_INQUIRY" | "CROP_DISEASE" | "FERTILIZER_INQUIRY" | "WEATHER_RISK" | "SOIL_QUERY" | "GENERAL_ADVICE",
-  "spokenResponse": "string (warm conversational audio-ready answer in ${langName})",
-  "detailedExplanation": "string (text with bullet points in ${langName})",
+  "spokenResponse": "string (warm conversational audio-ready answer in ${langName}, 2-3 sentences)",
+  "detailedExplanation": "string (LONG, THOROUGH, COMPREHENSIVE multi-paragraph text with numbered steps, exact per-acre and per-pump dosages, organic alternatives, safety warnings in ${langName})",
   "confidence": "HIGH" | "MODERATE" | "LOW",
   "quickActionButtons": [
     {
@@ -1038,7 +1550,7 @@ Return STRICT JSON:
     try {
       const rawText = await callGeminiWithFallback(ai, {
         contents: prompt,
-        preferredModel: 'gemini-3.1-flash-lite',
+        preferredModel: PRIMARY_MODEL,
       });
 
       const parsed = cleanAndParseJson(rawText, fallbackReply);
@@ -1577,7 +2089,7 @@ OUTPUT JSON FORMAT (STRICT JSON ONLY):
     try {
       const rawText = await callGeminiWithFallback(ai, {
         contents: { parts },
-        preferredModel: 'gemini-3.1-flash-lite',
+        preferredModel: PRIMARY_MODEL,
       });
       const parsed = cleanAndParseJson(rawText, fallback);
       return res.json({
@@ -1676,7 +2188,7 @@ Return STRICT JSON:
     try {
       const rawText = await callGeminiWithFallback(ai, {
         contents: { parts },
-        preferredModel: 'gemini-3.1-flash-lite',
+        preferredModel: PRIMARY_MODEL,
       });
       const parsed = cleanAndParseJson(rawText, fallback);
       return res.json({

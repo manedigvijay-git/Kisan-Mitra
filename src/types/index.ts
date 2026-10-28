@@ -111,6 +111,21 @@ export type FarmDiaryEntry = DiaryEntry;
 
 export type ConfidenceLevel = 'HIGH' | 'MODERATE' | 'LOW';
 
+export interface DetailedAgronomicCause {
+  cause: string;
+  likelihood: 'HIGH' | 'MEDIUM' | 'LOW';
+  explanation?: string;
+}
+
+export interface FertilizerDoseItem {
+  productName: string;
+  npk?: string;
+  dosePerAcre: string;
+  totalFieldDose: string;
+  applicationMethod: string;
+  timing: string;
+}
+
 export interface CropAnalysisResult {
   identifiedCrop: string;
   issueNameLocal: string;
@@ -127,13 +142,57 @@ export interface CropAnalysisResult {
   questionsForFarmer: string[];
   expertEscalationRecommended: boolean;
   directAnswer?: string;
+  detailedAnalysisParagraphs?: string;
   stepByStepSteps?: string[];
   recommendedScanReason?: string | null;
   immediateFirstAid?: string | null;
   expertEscalationReason?: string | null;
+  // Comprehensive 11-section fields
+  directAssessment?: string;
+  possibleCauses?: DetailedAgronomicCause[];
+  whatCanBeConcluded?: string;
+  whatCannotBeConcluded?: string;
+  additionalInfoNeeded?: string[];
+  immediateActions?: string[];
+  fertilizerNutrientRecommendations?: {
+    demandSummary?: string;
+    products?: FertilizerDoseItem[];
+    applicationPrecautions?: string;
+  };
+  organicAlternatives?: string[];
+  irrigationAndSoilConsiderations?: string;
+  pestDiseaseManagement?: {
+    culturalBiological?: string[];
+    chemicalFormulations?: { name: string; dosage: string; waitingPeriod?: string }[];
+  };
+  safetyAndMixingWarnings?: string[];
+  followUpMonitoring?: string;
 }
 
 export type SafetyStatus = 'SAFE' | 'NEED_MORE_INFO' | 'DO_NOT_RECOMMEND';
+
+export interface FertilizerAdvisorSchedule {
+  cropName: string;
+  variety?: string;
+  cropStage: string;
+  acreage: number;
+  acreageUnit: string;
+  soilType?: string;
+  irrigationMethod?: string;
+  nutrientDemandSummary: string;
+  recommendedProducts: FertilizerDoseItem[];
+  splitSchedule: {
+    stage: string;
+    timingDays: string;
+    fertilizers: string;
+    perAcreDose: string;
+    totalAreaDose: string;
+    method: string;
+  }[];
+  organicAlternatives: string[];
+  tankMixIncompatibilities: string[];
+  immediatePrecautions: string[];
+}
 
 export interface FertilizerEvaluationResult {
   extractedProduct: {
@@ -150,6 +209,7 @@ export interface FertilizerEvaluationResult {
   detailedAgronomicReason: string;
   recommendedDosage: {
     dosePerAcre: string;
+    totalFieldDose?: string;
     applicationMethod: 'soil_application' | 'foliar_spray' | 'fertigation_drip';
     instructions: string;
   };

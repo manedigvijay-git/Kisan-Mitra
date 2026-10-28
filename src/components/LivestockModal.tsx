@@ -14,8 +14,8 @@ import {
   ShieldCheck,
   PhoneCall,
   Clock,
-  Mic,
-  MicOff,
+  AudioLines,
+  Square,
   Camera,
   Layers,
   Sparkles,
@@ -430,9 +430,10 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
     const langCode = (language === 'hi' ? 'hi' : language === 'en' ? 'en' : 'mr') as 'mr' | 'hi' | 'en';
     const recognizer = createSpeechRecognizer(
       langCode,
-      (transcript: string) => {
-        if (transcript) {
-          setAnimalQuestion(transcript);
+      (res: any) => {
+        const text = typeof res === 'string' ? res : res?.transcript || '';
+        if (text) {
+          setAnimalQuestion(text);
         }
       },
       (err: any) => {
@@ -1107,13 +1108,13 @@ export const LivestockModal: React.FC<LivestockModalProps> = ({
                     >
                       {isListeningVoice ? (
                         <>
-                          <MicOff className="w-3.5 h-3.5 animate-bounce" />
+                          <Square className="w-3.5 h-3.5 fill-current animate-pulse" />
                           <span>ऐकत आहे... (थांबवा)</span>
                         </>
                       ) : (
                         <>
-                          <Mic className="w-3.5 h-3.5 text-amber-800" />
-                          <span>माईकवर बोला (Voice)</span>
+                          <AudioLines className="w-3.5 h-3.5 text-amber-800" />
+                          <span>आवाजाने विचारा (Voice)</span>
                         </>
                       )}
                     </button>

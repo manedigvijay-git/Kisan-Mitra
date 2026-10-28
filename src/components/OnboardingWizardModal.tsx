@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   X,
-  Mic,
+  AudioLines,
   MapPin,
   CheckCircle2,
   ArrowRight,
@@ -380,7 +380,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                         : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                     }`}
                   >
-                    <Mic className="w-4 h-4" />
+                    <AudioLines className="w-4 h-4" />
                   </button>
                 </div>
                 <p className="text-[11px] text-stone-500 flex items-center gap-1">
@@ -576,7 +576,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}
                           >
-                            <Mic className="w-3.5 h-3.5" />
+                            <AudioLines className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -679,7 +679,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}
                           >
-                            <Mic className="w-3.5 h-3.5" />
+                            <AudioLines className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -781,7 +781,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                                 : 'bg-emerald-100 text-emerald-800'
                             }`}
                           >
-                            <Mic className="w-3.5 h-3.5" />
+                            <AudioLines className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -909,7 +909,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -989,7 +989,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
-                        <Mic className="w-3.5 h-3.5" />
+                        <AudioLines className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
@@ -1081,7 +1081,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1162,7 +1162,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1278,7 +1278,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
-                        <Mic className="w-4 h-4" />
+                        <AudioLines className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -1354,7 +1354,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1429,7 +1429,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1509,7 +1509,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1589,7 +1589,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -1677,7 +1677,7 @@ export const OnboardingWizardModal: React.FC<OnboardingWizardModalProps> = ({
                           : 'bg-emerald-100 text-emerald-800'
                       }`}
                     >
-                      <Mic className="w-4 h-4" />
+                      <AudioLines className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

@@ -56,14 +56,28 @@ export function createSpeechRecognizer(
   }
 
   recognition.onresult = (event: any) => {
-    if (event.results && event.results[0] && event.results[0][0]) {
-      const text = event.results[0][0].transcript;
-      const isFinal = event.results[0].isFinal;
-      // Pass both object format and raw text compatible object
+    let finalTranscript = '';
+    let interimTranscript = '';
+
+    for (let i = 0; i < event.results.length; ++i) {
+      const res = event.results[i];
+      if (res && res[0]) {
+        if (res.isFinal) {
+          finalTranscript += res[0].transcript;
+        } else {
+          interimTranscript += res[0].transcript;
+        }
+      }
+    }
+
+    const currentText = (finalTranscript || interimTranscript).trim();
+    const isFinal = Boolean(finalTranscript) || Boolean(event.results[event.results.length - 1]?.isFinal);
+
+    if (currentText) {
       onResult({
-        transcript: text,
-        isFinal: isFinal,
-        toString: () => text,
+        transcript: currentText,
+        isFinal,
+        toString: () => currentText,
       });
     }
   };

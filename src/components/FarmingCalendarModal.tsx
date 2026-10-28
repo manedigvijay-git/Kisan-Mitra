@@ -10,7 +10,7 @@ import {
   Trash2,
   ChevronRight,
   Filter,
-  Mic,
+  AudioLines,
   Sprout,
   Heart,
   Droplets,

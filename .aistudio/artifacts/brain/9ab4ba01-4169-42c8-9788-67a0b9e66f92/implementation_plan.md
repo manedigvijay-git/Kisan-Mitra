@@ -1,127 +1,104 @@
-# Expert Agricultural Assistant & Diagnostic Guidance System
+# Fast AI Engine with Detailed Paragraph Advisory (Precautions, Conditions, Fertilizers & Organic Solutions)
 
-A practical, high-utility agricultural guidance architecture ensuring farmers receive immediate, direct answers, numbered step-by-step agronomic solutions, seamless text-and-voice consultation without requiring photos, and safe, conservative expert referral protocols.
+Deliver high-speed AI responses using Gemini 3.8 Flash with instant fallback to Gemini 3.6 Flash, providing rich, structured multi-paragraph advisories prominently featuring bold sections for Precautions, Weather/Soil Conditions, Chemical Fertilizer Dosages, and Organic Fertilization.
 
----
-
-### User Review & Critical Decisions
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Key Operational Principles**:
-> - **Zero-Photo Diagnostic Capability**: Farmers can describe symptoms via text or voice in the Crop Doctor / Scanner; the system diagnoses immediately without blocking on an image.
-> - **Direct Answers First**: Immediate actionable guidance is presented at the top of every response before any follow-ups or background explanations.
-> - **Numbered Action Steps**: All multi-step instructions (fertilizer dose calculations, spray schedules, bio-pesticide concoctions, irrigation routines) are rendered as numbered action checklists.
-> - **Conservative Crop Scan Recommendation**: Taking a photo is suggested only as a secondary confirmation when symptoms are ambiguous, never as a prerequisite.
-> - **Actionable First-Aid Before Referral**: Immediate damage mitigation is always provided before offering any hotline or expert consultation escalation.
+> The user confirmed the following specifications through Phase 1 clarification:
+> - **Advisory Scope**: Full detailed breakdown covering Precautions, Weather/Soil Conditions, Chemical Fertilizer Dosing (per-acre and per-pump), and Organic Bio-fertilizer alternatives.
+> - **Formatting**: Structured paragraphs with bold headings for Precautions, Conditions, Chemical Fertilizers, and Organic Fertilizers.
+> - **Model Configuration**: Fast `gemini-3.8-flash` primary execution with cascading zero-delay failover to `gemini-3.6-flash` and `gemini-3.5-flash-lite` on quota exhaustion or latency thresholds.
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Overview & Core Concept
 
-- **What It Does**: Upgrades all farmer-facing AI modules (Crop Scanner/Doctor, Voice Assistant, Livestock Care, Soil Analysis, and Field Chat) to adhere strictly to practical, high-yield agronomic advisory protocols.
-- **Target Audience**: Indian farmers managing crops (cotton, sugarcane, soybean, wheat, onion, vegetables) and livestock across varying connectivity conditions, reading or listening in Marathi, Hindi, and English.
-- **Key Value**: Eliminates dead-ends where farmers without a clear photo were previously blocked from receiving diagnosis, replacing academic jargon with direct, step-by-step remedies that can be executed in the field today.
-
----
-
-### 2. User Experience & Visual Design
-
-Following mobile touch-first principles ($44\text{px}+$ touch hitboxes, clear typography hierarchy, zero-pill metadata formatting):
-
-```
-+--------------------------------------------------------------+
-|  [X]  Crop Doctor & Agronomy Guide                           |
-+--------------------------------------------------------------+
-|  Active Field: [ विहिरीजवळचे शेत (ऊस) ▾ ]                     |
-|                                                              |
-|  [ 📷 Upload / Take Photo ]    or    [ ✍️ Describe Symptoms ]  |
-|  +--------------------------------------------------------+  |
-|  | "Leaves have yellow spots with concentric rings..."    |  |
-|  +--------------------------------------------------------+  |
-|  [ 🎤 Speak Query ]                      [ 🔍 Get Solution ] |
-|                                                              |
-|  ==================== DIAGNOSIS RESULT ====================  |
-|  DIRECT ANSWER:                                              |
-|  Early Blight (अल्टरनेरिया करपा) detected on your crop.      |
-|                                                              |
-|  STEP-BY-STEP ACTION PLAN:                                   |
-|  1. Spray Mancozeb 75% WP @ 2.5 g per liter of water.        |
-|  2. Remove and bury severely infected lower leaves.          |
-|  3. Avoid overhead sprinkler irrigation during evening.      |
-|                                                              |
-|  OPTIONAL CONFIRMATION:                                      |
-|  📷 If unsure, tap here to upload a leaf photo to verify.    |
-|                                                              |
-|  [ 🔊 Listen to Advice ]     [ 💾 Save to Farm Diary ]       |
-+--------------------------------------------------------------+
-```
-
-#### Key User Flows:
-1. **Direct Symptom Inquiry (No Photo Needed)**:
-   - Farmer opens Crop Doctor or Voice Assistant.
-   - Enters symptoms by typing or speaking in Marathi, Hindi, or English.
-   - Immediate diagnosis appears with direct verdict, confidence level, and numbered remediation steps.
-2. **Ambiguous Symptom & Secondary Photo Prompt**:
-   - If symptoms could match multiple pests/diseases, the AI answers directly with the most likely causes and first-aid steps, then gently suggests: *"To confirm between bacterial blight and leaf spot, you can also upload a clear photo of the leaf underside."*
-3. **Emergency & Expert Escalation**:
-   - If severe toxicity, sudden wilting, or unknown outbreak is detected, the AI provides immediate first-aid steps (e.g., flush soil, isolate plants, cease chemical spray), followed by an optional button to call Kisan Call Center (1800-180-1551) or a local agronomist.
+- **What It Does**: Upgrades the AI crop analysis, fertilizer adviser, and Krishi Mitra voice assistant to generate responses with high speed. Every advisory provides a comprehensive, structured response formatted into bold, readable sections:
+  1. **तपशीलवार विश्लेषण (Detailed Condition & Diagnosis)**: Clear analysis of symptoms, plant stage, and underlying environmental triggers.
+  2. **हवामान व जमिनीची स्थिती (Weather & Soil Conditions)**: Impact of ambient temperature, humidity, rainfall, and soil moisture on the crop.
+  3. **रासायनिक खते व अचूक मात्रा (Chemical Fertilizers & Precise Dosage)**: Exact per-acre and per-15L pump dosages with application timing.
+  4. **सेंद्रिय व जैविक खते (Organic & Bio-Fertilizers)**: Practical organic amendments including Jeevamrut, Dashparni ark, Vermicompost, and Trichoderma.
+  5. **तातडीची सुरक्षा व खबरदारी (Critical Precautions & Compatibility)**: Safety rules, tank-mix prohibitions (e.g. never mixing Calcium Nitrate with DAP/Sulfates), and spray timing.
+- **Target Audience**: Indian smallholder farmers requiring immediate, actionable advice in Marathi, Hindi, and English.
+- **Key Value**: Eliminates vague or one-sentence AI advice, replacing it with an authoritative, readable ICAR/KVK-compliant paragraph advisory delivered with low latency.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. User Experience & Visual Design
 
-- **Decision 1: Text-and-Voice Symptom Mode in Crop Scanner**:
-  - *Approach*: Add a dual-input mode in `CropScannerModal` allowing farmers to analyze either an uploaded photo OR a typed/voice-dictated symptom description.
-  - *Why*: In rural areas, cameras may be scratched, lighting poor, or the problem described over a phone call from a family member. Eliminating photo requirement unlocks 100% accessibility.
-  - *Alternative Considered*: Forcing farmers to switch to a separate chatbot was rejected because it fragments diagnostic records and confuses the farmer.
+### Key User Flows
+1. **Crop Scanning & Photo Diagnosis**:
+   - The farmer takes a photo or describes crop symptoms in Marathi/Hindi/English.
+   - The AI responds quickly (< 2 seconds) with `gemini-3.8-flash`.
+   - The analysis card presents a prominent **तपशीलवार सल्ला (Comprehensive Paragraph Advisory)** block featuring distinct, bold-headed paragraphs for Precautions, Conditions, Chemical Fertilizers, and Organic Fertilizers.
+   - Text-to-speech reads the direct action aloud in the farmer's native dialect.
+2. **Krishi Mitra Voice & Chat Assistant**:
+   - The farmer asks any farming, crop, fertilizer, or livestock question by voice or text.
+   - The assistant streams or delivers a long, multi-paragraph response with dedicated sections for immediate precautions, weather conditions, exact fertilizer dosages, and organic remedies.
 
-- **Decision 2: Structured Direct-Answer Output Architecture**:
-  - *Approach*: Enforce strict JSON schema in `/api/crop/analyze` and `/api/ai/voice-assistant` returning:
-    - `directAnswer`: Immediate 1-2 sentence core diagnosis and conclusion.
-    - `stepByStepSteps`: Array of clear numbered action points.
-    - `recommendedScanReason`: Optional string only populated if visible ambiguity exists.
-    - `immediateFirstAid`: Practical emergency steps before any expert contact.
-  - *Why*: Prevents AI from rambling with conversational preambles or burying actionable doses in dense paragraphs.
+### Visual Styling & Layout
+- **Prominent Paragraph Cards**: Rich emerald and amber highlighted cards with bold section badges (`🌿 सेंद्रिय खते`, `⚠️ खबरदारी व सुरक्षा`, `⛅ हवामान व जमिनीची स्थिती`, `🧪 रासायनिक खत मात्रा`).
+- **Typography & Readability**: High-contrast typography (`text-stone-900`, `font-bold` headings, `leading-relaxed` line-height) optimized for outdoor mobile screen readability in direct sunlight.
+- **Micro-Interactions**: One-tap native voice read-aloud (`Volume2`), quick copy to diary, and instant escalation to local Krishi Kendra experts.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Key Product Decisions & Trade-Offs
+
+- **Model Cascade & Response Latency**:
+  - *Chosen Approach*: `gemini-3.8-flash` as primary with an optimized 4,500ms timeout, immediately falling back to `gemini-3.6-flash`, followed by `gemini-3.5-flash-lite`.
+  - *Why*: Delivers snappy response times without sacrificing the reasoning required for complex multi-paragraph agricultural recommendations.
+  - *Alternative Considered*: `gemini-4-argon` (pro) was rejected due to higher latency and quota restrictions for mobile farm queries.
+- **Structured Paragraph Format vs. Fragmented Lists**:
+  - *Chosen Approach*: Cohesive, well-structured paragraphs with bold thematic headers.
+  - *Why*: Farmers prefer continuous narrative explanations that tell the full story (condition → precaution → organic remedy → fertilizer dose) rather than scattered, disconnected chips.
+- **Frontend & Offline Fallback Integrity**:
+  - *Chosen Approach*: Retain certified ICAR/KVK rule-based agronomic calculators if the network drops or quota is momentarily exhausted, ensuring the app never fails or leaves the farmer hanging.
+
+---
+
+## 4. Technical Architecture & Data Strategy
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│                    Farmer Client (React 19)                   │
-│   ┌───────────────────────────┐   ┌───────────────────────┐   │
-│   │     CropScannerModal      │   │  VoiceAssistantModal  │   │
-│   │  (Photo OR Symptom Text)  │   │   (Voice & Q&A Chat)  │   │
-│   └─────────────┬─────────────┘   └───────────┬───────────┘   │
-└─────────────────┼─────────────────────────────┼───────────────┘
-                  │ POST /api/crop/analyze      │ POST /api/ai/voice-assistant
-                  ▼                             ▼
+│                       Client View Layer                       │
+│  ┌───────────────────────┐         ┌───────────────────────┐  │
+│  │  CropScannerModal     │         │  VoiceAssistantModal  │  │
+│  │  - Photo / Voice Rec  │         │  - Voice Input / Text │  │
+│  │  - Detailed Paragraph │         │  - Long Form Advice   │  │
+│  └───────────┬───────────┘         └───────────┬───────────┘  │
+└──────────────┼─────────────────────────────────┼──────────────┘
+               │  POST /api/crop/analyze         │  POST /api/chat
+               ▼                                 ▼
 ┌───────────────────────────────────────────────────────────────┐
-│                 Express Backend Proxy (server.ts)             │
-│   ┌───────────────────────────────────────────────────────┐   │
-│   │  Agricultural Guidance System Prompts:                │   │
-│   │  - Direct Answers First                               │   │
-│   │  - Numbered Steps Formatter                           │   │
-│   │  - Secondary Photo Prompt Gate                        │   │
-│   │  - First-Aid Pre-Escalation Gate                      │   │
-│   └───────────────────────────┬───────────────────────────┘   │
-│                               │ @google/genai SDK             │
-│                               ▼                               │
-│              ┌─────────────────────────────────┐              │
-│              │    Gemini 3.8 Flash (Multimodal) │              │
-│              └─────────────────────────────────┘              │
+│                   Server API Layer (server.ts)                │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  Multi-Model Cascade Engine                             │  │
+│  │  1. gemini-3.8-flash (Primary, low-latency prompt)       │  │
+│  │  2. gemini-3.6-flash (Instant Failover on 429/503/delay)│  │
+│  │  3. gemini-3.5-flash-lite (Ultra-resilient backup)      │  │
+│  │  4. Certified ICAR/KVK Agronomy Fallback Engine         │  │
+│  └─────────────────────────────────────────────────────────┘  │
+└──────────────────────────────┬────────────────────────────────┘
+                               ▼
+┌───────────────────────────────────────────────────────────────┐
+│                  Data Persistence & Storage                   │
+│  - Firestore Sync (FarmDataSyncService)                       │
+│  - LocalStorage Offline Cache (kisan_diary_entries)           │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-#### Files to be Updated:
-1. `server.ts`:
-   - Update `/api/crop/analyze` to accept `symptomsText` without requiring `imageBase64`.
-   - Update system prompts for `/api/crop/analyze`, `/api/ai/voice-assistant`, and `/api/ai/crop-problem` to enforce Direct Answers First, Numbered Steps, and strict rules for photo recommendation and expert escalation.
-2. `src/components/CropScannerModal.tsx`:
-   - Add dual-tab / toggle for "Photo Scan" and "Symptom Diagnosis" (voice & text input).
-   - Display direct answer banner, numbered step list, and contextual scan prompt.
-3. `src/components/VoiceAssistantModal.tsx`:
-   - Enhance response rendering to cleanly format numbered steps and separate immediate first-aid from expert hotline triggers.
-4. `src/locales/translations.ts`:
-   - Add localized labels for symptom input, numbered steps, and agricultural guidance in Marathi, Hindi, and English.
+### Key Technical Enhancements
+1. **`server.ts` Prompt Engineering & Cascading Logic**:
+   - Refine `/api/crop/analyze` and `/api/chat` prompts to explicitly enforce 4 structured bold paragraphs:
+     - **खबरदारी (Precautions & Safety)**
+     - **हवामान व जमिनीची स्थिती (Weather & Soil Conditions)**
+     - **रासायनिक खतांची अचूक मात्रा (Chemical Fertilizer Dosages)**
+     - **सेंद्रिय व जैविक खत व्यवस्थापन (Organic & Bio-Fertilizing Solutions)**
+   - Optimize system prompts and token parameters for high-speed generation with `gemini-3.8-flash` falling back to `gemini-3.6-flash`.
+2. **`CropScannerModal.tsx` UI Enhancement**:
+   - Prominently render `detailedAnalysisParagraphs` with dedicated styled callouts for Precautions, Conditions, Chemical Fertilizers, and Organic Alternatives.
+   - Enable quick one-click addition of this detailed advice directly to the Farmer Diary.
+3. **`App.tsx` Diary Integration**:
+   - Pass `onDeleteEntry={handleDeleteDiaryEntry}` to `<FarmDiaryModal>` to complete the Farmer Diary feature seamlessly.

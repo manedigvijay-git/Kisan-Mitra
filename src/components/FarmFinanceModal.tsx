@@ -10,7 +10,7 @@ import {
   Check,
   Trash2,
   Filter,
-  Mic,
+  AudioLines,
   ArrowUpRight,
   ArrowDownRight,
   Sparkles,

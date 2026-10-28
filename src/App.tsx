@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Camera,
   FlaskConical,
-  Mic,
+  AudioLines,
   BookOpen,
   Home,
   Loader2,
@@ -273,6 +273,27 @@ const DEFAULT_INVENTORY: InventoryItem[] = [
   },
 ];
 
+const DEFAULT_LOCAL_DIARY_ENTRIES: FarmDiaryEntry[] = [
+  {
+    id: 'diary_default_1',
+    fieldId: 'field_1',
+    date: new Date().toISOString().split('T')[0],
+    activityType: 'spray',
+    title: '५% निंबोळी अर्क फवारणी केली (रसशोषक कीड नियंत्रण)',
+    description: '१५ लिटर पंपाला ४५ मिली निम तेल + ५ मिली स्टिकर वापरले. पानांच्या खालच्या बाजूवर व्यवस्थित फवारणी केली.',
+    cost: 450,
+  },
+  {
+    id: 'diary_default_2',
+    fieldId: 'field_1',
+    date: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
+    activityType: 'fertilizer',
+    title: 'ऊस पिकात १३:००:४५ आणि मायक्रोन्युट्रिएंट ड्रीपद्वारे दिले',
+    description: 'एकरी ३ किलो १३:००:४५ + ५०० ग्रॅम झिंक चिलेटेड ड्रीपद्वारे दिले.',
+    cost: 850,
+  },
+];
+
 export default function App() {
   const [language, setLanguage] = useState<Language>(() => {
     return (localStorage.getItem('kisan_lang') as Language) || 'mr';
@@ -281,7 +302,18 @@ export default function App() {
   // Authentication State: NULL until verified by Firebase Auth
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [profile, setProfile] = useState<FarmerProfile | null>(null);
-  const [diaryEntries, setDiaryEntries] = useState<FarmDiaryEntry[]>([]);
+  const [diaryEntries, setDiaryEntries] = useState<FarmDiaryEntry[]>(() => {
+    try {
+      const saved = localStorage.getItem('kisan_diary_entries');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return DEFAULT_LOCAL_DIARY_ENTRIES;
+    } catch {
+      return DEFAULT_LOCAL_DIARY_ENTRIES;
+    }
+  });
 
   // Smart Farm & Livestock Management States
   const [animals, setAnimals] = useState<Animal[]>(() => {
@@ -415,27 +447,8 @@ export default function App() {
       if (unsubInventory) { unsubInventory(); unsubInventory = null; }
 
       if (!firebaseUser) {
-        // User is in Local / Offline Farmer mode (or logged out)
-        try {
-          const savedProfile = localStorage.getItem('kisan_profile');
-          if (savedProfile) {
-            const parsed = JSON.parse(savedProfile);
-            if (parsed && (parsed.id || parsed.name)) {
-              setProfile({
-                ...parsed,
-                isFirebaseUser: false,
-                fields: parsed.fields && parsed.fields.length > 0 ? parsed.fields : DEFAULT_LOCAL_FIELDS,
-              });
-              setIsAuthChecking(false);
-              return;
-            }
-          }
-        } catch (e) {
-          console.warn('Local profile load warning:', e);
-        }
-
-        // Initialize with default local profile
-        setProfile(DEFAULT_LOCAL_PROFILE);
+        // No authenticated Firebase user on this device -> show signin interface
+        setProfile(null);
         setIsAuthChecking(false);
         return;
       }
@@ -480,6 +493,9 @@ export default function App() {
           };
 
           setProfile(loadedProfile);
+
+          // Automatically dismiss the signin modal once authentication is verified
+          setActiveModal((prevModal) => (prevModal === 'auth' ? null : prevModal));
 
           // Realtime subscriptions
           unsubFields = FarmDataSyncService.subscribeFields(uid, (remoteFields) => {
@@ -602,6 +618,10 @@ export default function App() {
     localStorage.setItem('kisan_inventory', JSON.stringify(inventory));
   }, [inventory]);
 
+  useEffect(() => {
+    localStorage.setItem('kisan_diary_entries', JSON.stringify(diaryEntries));
+  }, [diaryEntries]);
+
   // Fetch weather data when profile location is available
   useEffect(() => {
     if (!profile?.location) return;
@@ -640,11 +660,10 @@ export default function App() {
   };
 
   const handleSaveToDiary = (entry: { title: string; description: string; cost?: number; photoUrl?: string }) => {
-    if (!profile?.uid) return;
     const newEntry: FarmDiaryEntry = {
       id: `diary_${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
-      fieldId: profile.activeFieldId || 'field_1',
+      fieldId: profile?.activeFieldId || profile?.fields?.[0]?.id || 'field_1',
       activityType: 'problem',
       title: entry.title,
       description: entry.description,
@@ -652,9 +671,18 @@ export default function App() {
       photoUrl: entry.photoUrl,
     };
     setDiaryEntries((prev) => [newEntry, ...prev]);
-    if (profile.isFirebaseUser) {
+    if (profile?.uid && profile.isFirebaseUser) {
       FarmDataSyncService.saveDiaryEntry(profile.uid, newEntry).catch((err) =>
         console.warn('Sync diary entry notice:', err)
+      );
+    }
+  };
+
+  const handleDeleteDiaryEntry = (entryId: string) => {
+    setDiaryEntries((prev) => prev.filter((e) => e.id !== entryId));
+    if (profile?.uid && profile.isFirebaseUser) {
+      FarmDataSyncService.deleteDiaryEntry(profile.uid, entryId).catch((err) =>
+        console.warn('Delete diary entry error:', err)
       );
     }
   };
@@ -919,48 +947,56 @@ export default function App() {
       </main>
 
       {/* Bottom Floating Navigation for Instant Access */}
-      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-stone-200 py-2 px-3 shadow-lg">
-        <div className="max-w-md mx-auto grid grid-cols-5 gap-1 text-center">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-stone-200 py-1.5 px-2 shadow-lg">
+        <div className="max-w-lg mx-auto grid grid-cols-5 gap-0.5 text-center">
           <button
             onClick={() => handleCloseModal()}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-emerald-800 hover:bg-stone-100 cursor-pointer"
+            className={`flex flex-col items-center justify-center p-1 rounded-xl cursor-pointer ${
+              activeModal === null ? 'text-emerald-700 bg-emerald-50' : 'text-stone-600 hover:bg-stone-50'
+            }`}
           >
-            <Home className="w-5 h-5" />
-            <span className="text-[10px] font-extrabold mt-0.5">मुख्य</span>
+            <Home className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-[9px] sm:text-[10px] font-extrabold mt-0.5">मुख्य</span>
           </button>
 
           <button
             onClick={() => handleOpenAction('scan_crop')}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-emerald-700 hover:bg-stone-100 cursor-pointer"
+            className={`flex flex-col items-center justify-center p-1 rounded-xl cursor-pointer ${
+              activeModal === 'scan_crop' ? 'text-emerald-700 bg-emerald-50' : 'text-stone-600 hover:bg-stone-50'
+            }`}
           >
-            <Camera className="w-5 h-5" />
-            <span className="text-[10px] font-extrabold mt-0.5">पीक स्कॅन</span>
+            <Camera className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-[9px] sm:text-[10px] font-extrabold mt-0.5">पीक स्कॅन</span>
           </button>
 
           <button
             onClick={() => handleOpenAction('ask_voice')}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-blue-700 hover:bg-blue-50 cursor-pointer relative"
+            className="flex flex-col items-center justify-center p-1 rounded-xl text-blue-700 hover:bg-blue-50 cursor-pointer relative"
           >
-            <div className="w-9 h-9 -mt-4 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md">
-              <Mic className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 -mt-3 sm:-mt-4 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md">
+              <AudioLines className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <span className="text-[10px] font-black text-blue-700 mt-0.5">आवाज</span>
+            <span className="text-[9px] sm:text-[10px] font-black text-blue-700 mt-0.5">आवाज (AI)</span>
           </button>
 
           <button
             onClick={() => handleOpenAction('check_fertilizer')}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-amber-700 hover:bg-stone-100 cursor-pointer"
+            className={`flex flex-col items-center justify-center p-1 rounded-xl cursor-pointer ${
+              activeModal === 'check_fertilizer' ? 'text-amber-700 bg-amber-50' : 'text-stone-600 hover:bg-stone-50'
+            }`}
           >
-            <FlaskConical className="w-5 h-5" />
-            <span className="text-[10px] font-extrabold mt-0.5">खत खात्री</span>
+            <FlaskConical className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-[9px] sm:text-[10px] font-extrabold mt-0.5">खत खात्री</span>
           </button>
 
           <button
             onClick={() => handleOpenAction('farm_diary')}
-            className="flex flex-col items-center justify-center p-1.5 rounded-xl text-stone-700 hover:bg-stone-100 cursor-pointer"
+            className={`flex flex-col items-center justify-center p-1 rounded-xl cursor-pointer ${
+              activeModal === 'farm_diary' ? 'text-stone-900 bg-stone-100' : 'text-stone-600 hover:bg-stone-50'
+            }`}
           >
-            <BookOpen className="w-5 h-5" />
-            <span className="text-[10px] font-extrabold mt-0.5">डायरी</span>
+            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-[9px] sm:text-[10px] font-extrabold mt-0.5">डायरी</span>
           </button>
         </div>
       </nav>
